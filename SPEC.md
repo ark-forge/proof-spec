@@ -23,7 +23,7 @@ This spec covers:
 This spec does NOT cover:
 - Payment processing (Stripe, crypto, etc.)
 - Transport protocol (HTTP, MCP, etc.)
-- Timestamping backends (OpenTimestamps, etc.)
+- Timestamping backends (RFC 3161, etc.)
 - Storage format or retention policy
 
 ## 1. Proof structure
@@ -61,7 +61,7 @@ A conformant proof is a JSON object with these required fields:
 | `parties.agent_identity` | string | Agent's self-declared name |
 | `parties.agent_version` | string | Agent's version string |
 | `identity_consistent` | bool/null | Whether identity matches previous calls with same key |
-| `opentimestamps` | object | OTS status and download URL |
+| `timestamp_authority` | object | TSA status, provider, and download URL |
 | `archive_org` | object | Archive.org snapshot status and URL |
 | `verification_algorithm` | string | URL to algorithm documentation |
 
@@ -167,7 +167,7 @@ If the chain hash matches, no field in the proof was altered after creation.
 ### What verification does NOT prove
 
 - That the payment actually occurred (verify via Stripe API)
-- That the timestamp is accurate (verify via OpenTimestamps)
+- That the timestamp is accurate (verify via RFC 3161 TSA)
 - That the response content is correct (verify via the service)
 
 ## 6. Independent witnesses
@@ -177,7 +177,7 @@ A proof MAY be corroborated by independent witnesses:
 | Witness | What it proves | Verification |
 |---------|---------------|--------------|
 | **Stripe** | Payment occurred | Check `payment.transaction_id` on Stripe dashboard or API |
-| **Bitcoin** (OpenTimestamps) | Proof existed at claimed time | Verify `.ots` file against Bitcoin blockchain |
+| **RFC 3161 Timestamp** | Proof existed at claimed time | Verify `.tsr` file via `openssl ts -verify` |
 | **Archive.org** | Proof page was publicly visible | Visit `archive_org.snapshot_url` |
 
 No witness is required for chain hash verification. Each adds an independent layer of trust.
