@@ -1,4 +1,4 @@
-# ArkForge Proof Specification v1.0.0
+# ArkForge Proof Specification v1.1.0
 
 An open standard for verifiable agent-to-agent execution proofs.
 
@@ -33,6 +33,7 @@ A conformant proof is a JSON object with these required fields:
 ```json
 {
   "proof_id": "prf_20260225_170950_fdec72",
+  "spec_version": "1.0",
   "timestamp": "2026-02-25T17:09:47Z",
   "hashes": {
     "request": "sha256:<hex>",
@@ -50,6 +51,8 @@ A conformant proof is a JSON object with these required fields:
     "currency": "eur",
     "status": "succeeded"
   },
+  "arkforge_signature": "ed25519:<base64url>",
+  "arkforge_pubkey": "ed25519:<base64url>",
   "verification_url": "https://..."
 }
 ```
@@ -58,10 +61,14 @@ A conformant proof is a JSON object with these required fields:
 
 | Field | Type | Description |
 |-------|------|-------------|
+| `spec_version` | string | Proof format version (e.g. `"1.0"`). Informational for auditors |
+| `upstream_timestamp` | string | Upstream service's HTTP `Date` header (RFC 7231 format). Included in chain hash when present |
+| `arkforge_signature` | string | Ed25519 signature of the chain hash. Format: `ed25519:<base64url_without_padding>` |
+| `arkforge_pubkey` | string | Ed25519 public key used for signing. Format: `ed25519:<base64url_without_padding>` |
 | `parties.agent_identity` | string | Agent's self-declared name |
 | `parties.agent_version` | string | Agent's version string |
 | `identity_consistent` | bool/null | Whether identity matches previous calls with same key |
-| `timestamp_authority` | object | TSA status, provider, and download URL |
+| `timestamp_authority` | object | TSA status, provider, download URL, and `tsr_base64` (base64-encoded .tsr file) |
 | `archive_org` | object | Archive.org snapshot status and URL |
 | `verification_algorithm` | string | URL to algorithm documentation |
 
@@ -72,7 +79,7 @@ The chain hash binds every element of a transaction into a single verifiable sea
 ### Formula
 
 ```
-chain_hash = SHA256(request_hash + response_hash + payment_intent_id + timestamp + buyer_fingerprint + seller)
+chain_hash = SHA256(request_hash + response_hash + payment_intent_id + timestamp + buyer_fingerprint + seller [+ upstream_timestamp])
 ```
 
 ### Definitions
@@ -85,15 +92,25 @@ chain_hash = SHA256(request_hash + response_hash + payment_intent_id + timestamp
 | `timestamp` | ISO 8601 UTC string (e.g. `2026-02-25T17:09:47Z`) |
 | `buyer_fingerprint` | `SHA256(api_key)` — the raw API key string, not the proof field |
 | `seller` | Target domain (e.g. `arkforge.fr`) |
+| `upstream_timestamp` | Upstream service's HTTP `Date` header (optional — only included when the field is present and non-null in the proof JSON) |
 
 ### Concatenation
 
 All values are concatenated as raw UTF-8 strings with **no separator** before hashing.
 
 ```
+# Without upstream_timestamp (legacy proofs, or when upstream didn't return a Date header):
 input = request_hash + response_hash + payment_intent_id + timestamp + buyer_fingerprint + seller
+
+# With upstream_timestamp (when the field is present and non-null in the proof JSON):
+input = request_hash + response_hash + payment_intent_id + timestamp + buyer_fingerprint + seller + upstream_timestamp
+
 chain_hash = sha256(input.encode("utf-8")).hexdigest()
 ```
+
+### Backward compatibility
+
+The discriminant is **presence of the `upstream_timestamp` field** in the proof JSON. If the field is absent or null, use the original 6-component formula. If present and non-null, append it as a 7th component. Do **not** use `spec_version` for this decision (avoids string comparison pitfalls like `"1.10" < "1.9"`).
 
 ## 3. Canonical JSON
 
@@ -170,7 +187,56 @@ If the chain hash matches, no field in the proof was altered after creation.
 - That the timestamp is accurate (verify via RFC 3161 TSA)
 - That the response content is correct (verify via the service)
 
-## 6. Independent witnesses
+## 6. Digital signature
+
+The chain hash MAY be signed by the proof issuer using Ed25519. This proves **origin** (the proof was issued by ArkForge), not just **integrity** (the proof was not tampered with).
+
+### Algorithm
+
+- **Key type:** Ed25519
+- **Signed message:** the chain hash hex string, UTF-8 encoded (e.g. `"2f8bf97e19c9..."`)
+- **Encoding:** `ed25519:<base64url_without_padding>`
+  - Public key: 32 bytes → 43 chars base64url
+  - Signature: 64 bytes → 86 chars base64url
+
+### Proof fields
+
+| Field | Description |
+|-------|-------------|
+| `arkforge_signature` | Ed25519 signature of the chain hash. Format: `ed25519:<base64url>` |
+| `arkforge_pubkey` | Public key used for signing. Format: `ed25519:<base64url>` |
+
+### Verification
+
+```python
+from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PublicKey
+import base64
+
+# Decode base64url (add padding)
+def b64url_decode(s):
+    s += "=" * (4 - len(s) % 4) if len(s) % 4 else ""
+    return base64.urlsafe_b64decode(s)
+
+pubkey_b64 = proof["arkforge_pubkey"].removeprefix("ed25519:")
+sig_b64 = proof["arkforge_signature"].removeprefix("ed25519:")
+chain_hash = proof["hashes"]["chain"].removeprefix("sha256:")
+
+pub = Ed25519PublicKey.from_public_bytes(b64url_decode(pubkey_b64))
+pub.verify(b64url_decode(sig_b64), chain_hash.encode("utf-8"))
+# Raises InvalidSignature if verification fails
+```
+
+### What the signature covers vs. does not cover
+
+**Covered** (via the chain hash): `request_hash`, `response_hash`, `payment_intent_id`, `timestamp`, `buyer_fingerprint`, `seller`, `upstream_timestamp` (if present).
+
+**Not covered** (mutable metadata): `views_count`, `identity_consistent`, `archive_org`, `timestamp_authority` status. These fields are informational and may change after proof creation.
+
+### Key distribution
+
+The issuer's public key is embedded in each proof (`arkforge_pubkey`) and served at `GET /v1/pubkey`. Verifiers SHOULD pin the public key from a trusted source rather than relying solely on the `arkforge_pubkey` field within the proof itself.
+
+## 7. Independent witnesses
 
 A proof MAY be corroborated by independent witnesses:
 
@@ -182,13 +248,13 @@ A proof MAY be corroborated by independent witnesses:
 
 No witness is required for chain hash verification. Each adds an independent layer of trust.
 
-## 7. Test vectors
+## 8. Test vectors
 
 See [`test-vectors.json`](test-vectors.json) for machine-readable test cases.
 
 Implementers MUST pass all test vectors to claim conformance.
 
-## 8. Versioning
+## 9. Versioning
 
 This spec follows [Semantic Versioning](https://semver.org/).
 

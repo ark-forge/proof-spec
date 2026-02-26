@@ -1,9 +1,9 @@
 {
-  "spec_version": "1.0.0",
+  "spec_version": "1.1.0",
   "algorithm": "SHA-256",
   "canonical_json_rule": "json.dumps(data, sort_keys=True, separators=(\",\", \":\"))",
-  "chain_formula": "SHA256(request_hash + response_hash + payment_intent_id + timestamp + buyer_fingerprint + seller)",
-  "note": "buyer_fingerprint = SHA256(api_key). All concatenation uses raw strings, no separator.",
+  "chain_formula": "SHA256(request_hash + response_hash + payment_intent_id + timestamp + buyer_fingerprint + seller [+ upstream_timestamp])",
+  "note": "buyer_fingerprint = SHA256(api_key). All concatenation uses raw strings, no separator. upstream_timestamp is appended only when present and non-null in the proof JSON.",
   "vectors": [
     {
       "name": "minimal_transaction",
@@ -72,6 +72,34 @@
         "response_hash": "2053dc3f291fcccebdb6422245961f4ca8286429a43abb43ececa046e02c53f5",
         "buyer_fingerprint": "946c2590ed78f3d636119666359a72188a8f81c3495218b3331fd80ec9c3536f",
         "chain_hash": "47df038b1fc3c8129ccecc806fce54bf2b9f8f28ff0ad4a10b0c56ab9a4e5ebc"
+      }
+    },
+    {
+      "name": "with_upstream_timestamp",
+      "note": "Same inputs as minimal_transaction, but with upstream_timestamp appended to chain input. The chain_hash MUST differ from minimal_transaction.",
+      "input": {
+        "request": {
+          "repo_url": "https://github.com/example/app"
+        },
+        "response": {
+          "files_scanned": 42,
+          "frameworks": [
+            "openai"
+          ]
+        },
+        "payment_intent_id": "pi_test_abc123",
+        "timestamp": "2026-01-15T12:00:00Z",
+        "api_key": "mcp_test_example_key",
+        "seller": "arkforge.fr",
+        "upstream_timestamp": "Wed, 15 Jan 2026 12:00:01 GMT"
+      },
+      "expected": {
+        "canonical_request": "{\"repo_url\":\"https://github.com/example/app\"}",
+        "canonical_response": "{\"files_scanned\":42,\"frameworks\":[\"openai\"]}",
+        "request_hash": "0987aa49eb45583406b66c77ea6f35498bd318b81040bec9c54ab439114abe42",
+        "response_hash": "bad7c7f7f632182e9d746c9a4a02aea5f526a6a76c5108c4a98a7c4823fdbef2",
+        "buyer_fingerprint": "7c8f263e06d5ce4681f750ad64ede882a4ebd87de60f9ae0e6b06f0300645a11",
+        "chain_hash": "b55b4492c864adfc368c07159b6b0ab831307f49284b3a11f1b48d87ba65877d"
       }
     }
   ]
