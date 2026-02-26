@@ -1,0 +1,78 @@
+{
+  "spec_version": "1.0.0",
+  "algorithm": "SHA-256",
+  "canonical_json_rule": "json.dumps(data, sort_keys=True, separators=(\",\", \":\"))",
+  "chain_formula": "SHA256(request_hash + response_hash + payment_intent_id + timestamp + buyer_fingerprint + seller)",
+  "note": "buyer_fingerprint = SHA256(api_key). All concatenation uses raw strings, no separator.",
+  "vectors": [
+    {
+      "name": "minimal_transaction",
+      "input": {
+        "request": {
+          "repo_url": "https://github.com/example/app"
+        },
+        "response": {
+          "files_scanned": 42,
+          "frameworks": [
+            "openai"
+          ]
+        },
+        "payment_intent_id": "pi_test_abc123",
+        "timestamp": "2026-01-15T12:00:00Z",
+        "api_key": "mcp_test_example_key",
+        "seller": "arkforge.fr"
+      },
+      "expected": {
+        "canonical_request": "{\"repo_url\":\"https://github.com/example/app\"}",
+        "canonical_response": "{\"files_scanned\":42,\"frameworks\":[\"openai\"]}",
+        "request_hash": "0987aa49eb45583406b66c77ea6f35498bd318b81040bec9c54ab439114abe42",
+        "response_hash": "bad7c7f7f632182e9d746c9a4a02aea5f526a6a76c5108c4a98a7c4823fdbef2",
+        "buyer_fingerprint": "7c8f263e06d5ce4681f750ad64ede882a4ebd87de60f9ae0e6b06f0300645a11",
+        "chain_hash": "2f8bf97e19c9743ca386830a2219be84ff5411ae83f54e5aaf390f7d2215c431"
+      }
+    },
+    {
+      "name": "empty_payload",
+      "input": {
+        "request": {},
+        "response": {},
+        "payment_intent_id": "pi_test_empty",
+        "timestamp": "2026-06-01T00:00:00Z",
+        "api_key": "mcp_test_empty_key",
+        "seller": "example.com"
+      },
+      "expected": {
+        "canonical_request": "{}",
+        "canonical_response": "{}",
+        "request_hash": "44136fa355b3678a1146ad16f7e8649e94fb4fc21fe77e8310c060f61caaff8a",
+        "response_hash": "44136fa355b3678a1146ad16f7e8649e94fb4fc21fe77e8310c060f61caaff8a",
+        "buyer_fingerprint": "f522c75ab797b1d03edb44fc24904b54f44c9d6264f7610165be0c66d469ac16",
+        "chain_hash": "701f793769f974eacc46bf97b4928f70f4fb4e88350599223dabf9530e6f9e66"
+      }
+    },
+    {
+      "name": "unicode_payload",
+      "input": {
+        "request": {
+          "query": "données personnelles € GDPR"
+        },
+        "response": {
+          "status": "compliant",
+          "note": "café ñ 日本語"
+        },
+        "payment_intent_id": "pi_live_xyz789",
+        "timestamp": "2026-03-20T18:30:00Z",
+        "api_key": "mcp_pro_unicode_key",
+        "seller": "api.example.co.uk"
+      },
+      "expected": {
+        "canonical_request": "{\"query\":\"donn\\u00e9es personnelles \\u20ac GDPR\"}",
+        "canonical_response": "{\"note\":\"caf\\u00e9 \\u00f1 \\u65e5\\u672c\\u8a9e\",\"status\":\"compliant\"}",
+        "request_hash": "095403ecf7d636b48b0bcd6b1e4823f9c244abe25b8e16beed960676d9ffad7a",
+        "response_hash": "2053dc3f291fcccebdb6422245961f4ca8286429a43abb43ececa046e02c53f5",
+        "buyer_fingerprint": "946c2590ed78f3d636119666359a72188a8f81c3495218b3331fd80ec9c3536f",
+        "chain_hash": "47df038b1fc3c8129ccecc806fce54bf2b9f8f28ff0ad4a10b0c56ab9a4e5ebc"
+      }
+    }
+  ]
+}
