@@ -29,7 +29,7 @@ Want to add yours? Open a PR.
 
 ## Test vectors
 
-[`test-vectors.json`](test-vectors.json) contains 4 test cases (minimal, empty, unicode, with_upstream_timestamp). Any conformant implementation MUST pass all vectors.
+[`test-vectors.json`](test-vectors.json) contains 5 test cases (minimal, empty, unicode, with_upstream_timestamp, free_tier). Any conformant implementation MUST pass all vectors.
 
 ## License
 
