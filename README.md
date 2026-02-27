@@ -31,6 +31,10 @@ Want to add yours? Open a PR.
 
 [`test-vectors.json`](test-vectors.json) contains 5 test cases (minimal, empty, unicode, with_upstream_timestamp, free_tier). Any conformant implementation MUST pass all vectors.
 
+## Roadmap
+
+The proof format will evolve to support third-party provider attestations and multi-PSP payment verification. See the [Trust Layer roadmap](https://github.com/ark-forge/trust-layer/blob/main/ROADMAP.md) for the full architecture.
+
 ## License
 
 [CC BY 4.0](https://creativecommons.org/licenses/by/4.0/)
