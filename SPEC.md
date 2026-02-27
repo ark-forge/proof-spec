@@ -33,7 +33,7 @@ A conformant proof is a JSON object with these required fields:
 ```json
 {
   "proof_id": "prf_20260225_170950_fdec72",
-  "spec_version": "1.0",
+  "spec_version": "1.1",
   "timestamp": "2026-02-25T17:09:47Z",
   "hashes": {
     "request": "sha256:<hex>",
@@ -72,7 +72,7 @@ Both variants produce a valid chain hash. The `transaction_id` value (`pi_...` o
 
 | Field | Type | Description |
 |-------|------|-------------|
-| `spec_version` | string | Proof format version (e.g. `"1.0"`). Informational for auditors |
+| `spec_version` | string | Proof format version (e.g. `"1.1"`). Informational for auditors |
 | `upstream_timestamp` | string | Upstream service's HTTP `Date` header (RFC 7231 format). Included in chain hash when present |
 | `arkforge_signature` | string | Ed25519 signature of the chain hash. Format: `ed25519:<base64url_without_padding>` |
 | `arkforge_pubkey` | string | Ed25519 public key used for signing. Format: `ed25519:<base64url_without_padding>` |
