@@ -57,6 +57,17 @@ A conformant proof is a JSON object with these required fields:
 }
 ```
 
+### Payment field variants
+
+The `payment` object reflects how the proof was generated:
+
+| Plan | `provider` | `transaction_id` | `amount` | `status` |
+|------|-----------|-----------------|----------|----------|
+| Pro | `"stripe"` | Stripe Payment Intent ID (`pi_...`) | `> 0` | `"succeeded"` |
+| Free | `"none"` | `"free_tier"` | `0.0` | `"free_tier"` |
+
+Both variants produce a valid chain hash. The `transaction_id` value (`pi_...` or `free_tier`) is used as-is in the chain hash computation.
+
 ### Optional fields
 
 | Field | Type | Description |
@@ -88,7 +99,7 @@ chain_hash = SHA256(request_hash + response_hash + payment_intent_id + timestamp
 |-----------|-----------|
 | `request_hash` | `SHA256(canonical_json(request_data))` |
 | `response_hash` | `SHA256(canonical_json(response_data))` |
-| `payment_intent_id` | Stripe Payment Intent ID (e.g. `pi_3T4ovu...`) |
+| `payment_intent_id` | Payment transaction ID: Stripe Payment Intent ID (e.g. `pi_3T4ovu...`) for Pro, or `free_tier` for Free plan |
 | `timestamp` | ISO 8601 UTC string (e.g. `2026-02-25T17:09:47Z`) |
 | `buyer_fingerprint` | `SHA256(api_key)` — the raw API key string, not the proof field |
 | `seller` | Target domain (e.g. `arkforge.fr`) |
@@ -183,7 +194,7 @@ If the chain hash matches, no field in the proof was altered after creation.
 
 ### What verification does NOT prove
 
-- That the payment actually occurred (verify via Stripe API)
+- That the payment actually occurred (verify via Stripe API for Pro proofs; Free proofs have `payment.provider = "none"`)
 - That the timestamp is accurate (verify via RFC 3161 TSA)
 - That the response content is correct (verify via the service)
 
@@ -240,11 +251,14 @@ The issuer's public key is embedded in each proof (`arkforge_pubkey`) and served
 
 A proof MAY be corroborated by independent witnesses:
 
-| Witness | What it proves | Verification |
-|---------|---------------|--------------|
-| **Stripe** | Payment occurred | Check `payment.transaction_id` on Stripe dashboard or API |
-| **RFC 3161 Timestamp** | Proof existed at claimed time | Verify `.tsr` file via `openssl ts -verify` |
-| **Archive.org** | Proof page was publicly visible | Visit `archive_org.snapshot_url` |
+| Witness | What it proves | Verification | Availability |
+|---------|---------------|--------------|-------------|
+| **Ed25519 Signature** | Proof was issued by ArkForge | Verify `arkforge_signature` with `arkforge_pubkey` | All plans |
+| **RFC 3161 Timestamp** | Proof existed at claimed time | Verify `.tsr` file via `openssl ts -verify` | All plans |
+| **Archive.org** | Proof page was publicly visible | Visit `archive_org.snapshot_url` | All plans |
+| **Stripe** | Payment occurred | Check `payment.transaction_id` on Stripe dashboard or API | Pro plan only |
+
+Free tier proofs have 3 witnesses (Ed25519, RFC 3161, Archive.org). Pro proofs add Stripe as a 4th witness.
 
 No witness is required for chain hash verification. Each adds an independent layer of trust.
 

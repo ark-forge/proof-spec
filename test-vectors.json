@@ -101,6 +101,30 @@
         "buyer_fingerprint": "7c8f263e06d5ce4681f750ad64ede882a4ebd87de60f9ae0e6b06f0300645a11",
         "chain_hash": "b55b4492c864adfc368c07159b6b0ab831307f49284b3a11f1b48d87ba65877d"
       }
+    },
+    {
+      "name": "free_tier",
+      "note": "Free plan proof: payment_intent_id is 'free_tier' (literal string), not a Stripe ID. Chain hash algorithm is identical.",
+      "input": {
+        "request": {
+          "action": "scan"
+        },
+        "response": {
+          "result": "ok"
+        },
+        "payment_intent_id": "free_tier",
+        "timestamp": "2026-02-27T15:00:00Z",
+        "api_key": "mcp_free_example_key",
+        "seller": "example.com"
+      },
+      "expected": {
+        "canonical_request": "{\"action\":\"scan\"}",
+        "canonical_response": "{\"result\":\"ok\"}",
+        "request_hash": "c1512c3590bee197efafc9daf965db068b665047620e3096b6e008354d7f4039",
+        "response_hash": "1aad36b0fb02621b951649811957ba7ad67d4838c2932d02088f7d6e8db74313",
+        "buyer_fingerprint": "ee7492ff20be38ffbd5e6c49bb24abe5251adac2009a6d35ff02f8d8dcd2ba16",
+        "chain_hash": "ddbde995589fc8870f0da2ddf61af653b00ba479563c86edfb2b2557e7652de5"
+      }
     }
   ]
 }
