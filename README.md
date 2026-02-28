@@ -13,9 +13,11 @@ A deterministic proof format that binds a request, response, payment, and timest
 Given a proof JSON, verify it in one line:
 
 ```bash
-printf '%s' "${REQUEST_HASH}${RESPONSE_HASH}${PAYMENT_ID}${TIMESTAMP}${BUYER}${SELLER}" \
+printf '%s' "${REQUEST_HASH}${RESPONSE_HASH}${PAYMENT_ID}${TIMESTAMP}${BUYER}${SELLER}${UPSTREAM}${RECEIPT_HASH}" \
   | sha256sum | cut -d' ' -f1
 ```
+
+`UPSTREAM` and `RECEIPT_HASH` are empty strings when absent from the proof.
 
 If the result matches `proof.hashes.chain`, the proof is intact.
 
@@ -29,7 +31,7 @@ Want to add yours? Open a PR.
 
 ## Test vectors
 
-[`test-vectors.json`](test-vectors.json) contains 5 test cases (minimal, empty, unicode, with_upstream_timestamp, free_tier). Any conformant implementation MUST pass all vectors.
+[`test-vectors.json`](test-vectors.json) contains 7 test cases (minimal, empty, unicode, with_upstream_timestamp, free_tier, with_receipt_content_hash, with_upstream_and_receipt). Any conformant implementation MUST pass all vectors.
 
 ## Roadmap
 

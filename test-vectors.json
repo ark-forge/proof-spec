@@ -1,9 +1,9 @@
 {
-  "spec_version": "1.1.0",
+  "spec_version": "2.0.0",
   "algorithm": "SHA-256",
   "canonical_json_rule": "json.dumps(data, sort_keys=True, separators=(\",\", \":\"))",
-  "chain_formula": "SHA256(request_hash + response_hash + payment_intent_id + timestamp + buyer_fingerprint + seller [+ upstream_timestamp])",
-  "note": "buyer_fingerprint = SHA256(api_key). All concatenation uses raw strings, no separator. upstream_timestamp is appended only when present and non-null in the proof JSON.",
+  "chain_formula": "SHA256(request_hash + response_hash + payment_intent_id + timestamp + buyer_fingerprint + seller [+ upstream_timestamp] [+ receipt_content_hash])",
+  "note": "buyer_fingerprint = SHA256(api_key). All concatenation uses raw strings, no separator. upstream_timestamp is appended only when present and non-null in the proof JSON. receipt_content_hash is appended only when payment_evidence.receipt_content_hash is present (stripped of sha256: prefix).",
   "vectors": [
     {
       "name": "minimal_transaction",
@@ -124,6 +124,63 @@
         "response_hash": "1aad36b0fb02621b951649811957ba7ad67d4838c2932d02088f7d6e8db74313",
         "buyer_fingerprint": "ee7492ff20be38ffbd5e6c49bb24abe5251adac2009a6d35ff02f8d8dcd2ba16",
         "chain_hash": "ddbde995589fc8870f0da2ddf61af653b00ba479563c86edfb2b2557e7652de5"
+      }
+    },
+    {
+      "name": "with_receipt_content_hash",
+      "note": "Same inputs as minimal_transaction, but with receipt_content_hash appended to chain input. The chain_hash MUST differ from minimal_transaction. The receipt_content_hash is the SHA-256 of raw receipt HTML bytes.",
+      "input": {
+        "request": {
+          "repo_url": "https://github.com/example/app"
+        },
+        "response": {
+          "files_scanned": 42,
+          "frameworks": [
+            "openai"
+          ]
+        },
+        "payment_intent_id": "pi_test_abc123",
+        "timestamp": "2026-01-15T12:00:00Z",
+        "api_key": "mcp_test_example_key",
+        "seller": "arkforge.fr",
+        "receipt_content_hash": "af65b75f3901dfd0ed9590a009bf7283e318801e15733bf68403219967d4edb7"
+      },
+      "expected": {
+        "canonical_request": "{\"repo_url\":\"https://github.com/example/app\"}",
+        "canonical_response": "{\"files_scanned\":42,\"frameworks\":[\"openai\"]}",
+        "request_hash": "0987aa49eb45583406b66c77ea6f35498bd318b81040bec9c54ab439114abe42",
+        "response_hash": "bad7c7f7f632182e9d746c9a4a02aea5f526a6a76c5108c4a98a7c4823fdbef2",
+        "buyer_fingerprint": "7c8f263e06d5ce4681f750ad64ede882a4ebd87de60f9ae0e6b06f0300645a11",
+        "chain_hash": "6264fc74e9948421f44f7d9b700a8cd5d48230ac702c82663fc383f17ae725ce"
+      }
+    },
+    {
+      "name": "with_upstream_and_receipt",
+      "note": "Same inputs as minimal_transaction, with both upstream_timestamp AND receipt_content_hash. Both are appended in order: upstream_timestamp first, then receipt_content_hash. The chain_hash MUST differ from all other vectors.",
+      "input": {
+        "request": {
+          "repo_url": "https://github.com/example/app"
+        },
+        "response": {
+          "files_scanned": 42,
+          "frameworks": [
+            "openai"
+          ]
+        },
+        "payment_intent_id": "pi_test_abc123",
+        "timestamp": "2026-01-15T12:00:00Z",
+        "api_key": "mcp_test_example_key",
+        "seller": "arkforge.fr",
+        "upstream_timestamp": "Wed, 15 Jan 2026 12:00:01 GMT",
+        "receipt_content_hash": "af65b75f3901dfd0ed9590a009bf7283e318801e15733bf68403219967d4edb7"
+      },
+      "expected": {
+        "canonical_request": "{\"repo_url\":\"https://github.com/example/app\"}",
+        "canonical_response": "{\"files_scanned\":42,\"frameworks\":[\"openai\"]}",
+        "request_hash": "0987aa49eb45583406b66c77ea6f35498bd318b81040bec9c54ab439114abe42",
+        "response_hash": "bad7c7f7f632182e9d746c9a4a02aea5f526a6a76c5108c4a98a7c4823fdbef2",
+        "buyer_fingerprint": "7c8f263e06d5ce4681f750ad64ede882a4ebd87de60f9ae0e6b06f0300645a11",
+        "chain_hash": "9174e8414537ba3268367fd49c239ac509cde868791db4935ad3467f71a90974"
       }
     }
   ]

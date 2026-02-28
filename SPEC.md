@@ -1,4 +1,4 @@
-# ArkForge Proof Specification v1.1.0
+# ArkForge Proof Specification v2.0.0
 
 An open standard for verifiable agent-to-agent execution proofs.
 
@@ -33,7 +33,7 @@ A conformant proof is a JSON object with these required fields:
 ```json
 {
   "proof_id": "prf_20260225_170950_fdec72",
-  "spec_version": "1.1",
+  "spec_version": "2.0",
   "timestamp": "2026-02-25T17:09:47Z",
   "hashes": {
     "request": "sha256:<hex>",
@@ -57,6 +57,8 @@ A conformant proof is a JSON object with these required fields:
 }
 ```
 
+**Note:** proofs without `payment_evidence` may use `spec_version: "1.1"` (backward compatible). Proofs with `payment_evidence.receipt_content_hash` use `spec_version: "2.0"`.
+
 ### Payment field variants
 
 The `payment` object reflects how the proof was generated:
@@ -72,8 +74,9 @@ Both variants produce a valid chain hash. The `transaction_id` value (`pi_...` o
 
 | Field | Type | Description |
 |-------|------|-------------|
-| `spec_version` | string | Proof format version (e.g. `"1.1"`). Informational for auditors |
+| `spec_version` | string | Proof format version (`"1.1"` or `"2.0"`). Informational for auditors |
 | `upstream_timestamp` | string | Upstream service's HTTP `Date` header (RFC 7231 format). Included in chain hash when present |
+| `payment_evidence` | object | External receipt verification (see section 2b). `receipt_content_hash` included in chain hash when present |
 | `arkforge_signature` | string | Ed25519 signature of the chain hash. Format: `ed25519:<base64url_without_padding>` |
 | `arkforge_pubkey` | string | Ed25519 public key used for signing. Format: `ed25519:<base64url_without_padding>` |
 | `parties.agent_identity` | string | Agent's self-declared name |
@@ -90,7 +93,7 @@ The chain hash binds every element of a transaction into a single verifiable sea
 ### Formula
 
 ```
-chain_hash = SHA256(request_hash + response_hash + payment_intent_id + timestamp + buyer_fingerprint + seller [+ upstream_timestamp])
+chain_hash = SHA256(request_hash + response_hash + payment_intent_id + timestamp + buyer_fingerprint + seller [+ upstream_timestamp] [+ receipt_content_hash])
 ```
 
 ### Definitions
@@ -104,24 +107,75 @@ chain_hash = SHA256(request_hash + response_hash + payment_intent_id + timestamp
 | `buyer_fingerprint` | `SHA256(api_key)` — the raw API key string, not the proof field |
 | `seller` | Target domain (e.g. `arkforge.fr`) |
 | `upstream_timestamp` | Upstream service's HTTP `Date` header (optional — only included when the field is present and non-null in the proof JSON) |
+| `receipt_content_hash` | SHA-256 hex digest of raw receipt bytes (optional — only included when `payment_evidence.receipt_content_hash` is present in the proof JSON). Strip the `sha256:` prefix before concatenation |
 
 ### Concatenation
 
-All values are concatenated as raw UTF-8 strings with **no separator** before hashing.
+All values are concatenated as raw UTF-8 strings with **no separator** before hashing. Optional components are appended in order when present.
 
 ```
-# Without upstream_timestamp (legacy proofs, or when upstream didn't return a Date header):
+# Base formula (no optional fields):
 input = request_hash + response_hash + payment_intent_id + timestamp + buyer_fingerprint + seller
 
-# With upstream_timestamp (when the field is present and non-null in the proof JSON):
-input = request_hash + response_hash + payment_intent_id + timestamp + buyer_fingerprint + seller + upstream_timestamp
+# With upstream_timestamp:
+input += upstream_timestamp
+
+# With receipt_content_hash (from payment_evidence.receipt_content_hash, stripped of "sha256:" prefix):
+input += receipt_content_hash
 
 chain_hash = sha256(input.encode("utf-8")).hexdigest()
 ```
 
 ### Backward compatibility
 
-The discriminant is **presence of the `upstream_timestamp` field** in the proof JSON. If the field is absent or null, use the original 6-component formula. If present and non-null, append it as a 7th component. Do **not** use `spec_version` for this decision (avoids string comparison pitfalls like `"1.10" < "1.9"`).
+Each optional component is discriminated by **presence of its field** in the proof JSON:
+- `upstream_timestamp`: if the field is absent or null, do not append. If present and non-null, append after `seller`.
+- `receipt_content_hash`: if `payment_evidence.receipt_content_hash` is absent or null, do not append. If present, strip the `sha256:` prefix and append after `upstream_timestamp` (or after `seller` if `upstream_timestamp` is absent).
+
+Do **not** use `spec_version` for this decision (avoids string comparison pitfalls like `"1.10" < "1.9"`).
+
+## 2b. Payment evidence (v2.0)
+
+A proof MAY include external payment evidence — an independently fetched receipt from a payment service provider (PSP). When present, the receipt content hash is included in the chain hash.
+
+### Structure
+
+```json
+{
+  "payment_evidence": {
+    "type": "stripe",
+    "receipt_url": "https://pay.stripe.com/receipts/payment/...",
+    "receipt_fetch_status": "fetched",
+    "receipt_content_hash": "sha256:<hex>",
+    "parsing_status": "success",
+    "parsed_fields": {"amount": 25.0, "currency": "usd", "status": "paid", "date": "..."},
+    "payment_verification": "fetched"
+  }
+}
+```
+
+### Fields
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `type` | string | PSP identifier (e.g. `"stripe"`) |
+| `receipt_url` | string | Original receipt URL fetched by ArkForge |
+| `receipt_fetch_status` | string | `"fetched"` (success) or `"failed"` (timeout, HTTP error, invalid domain) |
+| `receipt_content_hash` | string | `sha256:<hex>` — SHA-256 of the raw receipt bytes. **Included in chain hash** |
+| `parsing_status` | string | `"success"`, `"failed"`, or `"not_attempted"` |
+| `parsed_fields` | object/null | Extracted fields (amount, currency, status, date). Null if parsing failed |
+| `payment_verification` | string | `"fetched"` (independently verified) or `"failed"` |
+| `receipt_fetch_error` | string | Error details (only present on failure) |
+
+### Chain hash impact
+
+When `payment_evidence.receipt_content_hash` is present, its value (with the `sha256:` prefix stripped) is appended to the chain hash input. This binds the external receipt to the proof — modifying the receipt content after the fact invalidates the chain hash.
+
+### What payment evidence proves vs. does not prove
+
+**Proves:** ArkForge fetched a receipt from the PSP at the time of proof creation, and the content matched the stored hash.
+
+**Does NOT prove:** that the receipt is for the correct transaction, the correct amount, or the correct provider. The provider must verify the receipt independently — the proof records what ArkForge observed.
 
 ## 3. Canonical JSON
 
@@ -174,9 +228,11 @@ PAYMENT_ID=$(echo "$PROOF" | jq -r '.payment.transaction_id')
 TIMESTAMP=$(echo "$PROOF" | jq -r '.timestamp')
 BUYER=$(echo "$PROOF" | jq -r '.parties.buyer_fingerprint')
 SELLER=$(echo "$PROOF" | jq -r '.parties.seller')
+UPSTREAM=$(echo "$PROOF" | jq -r '.upstream_timestamp // empty')
+RECEIPT_HASH=$(echo "$PROOF" | jq -r '.payment_evidence.receipt_content_hash // empty' | sed 's/sha256://')
 
 # 2. Recompute chain hash
-COMPUTED=$(printf '%s' "${REQUEST_HASH}${RESPONSE_HASH}${PAYMENT_ID}${TIMESTAMP}${BUYER}${SELLER}" | sha256sum | cut -d' ' -f1)
+COMPUTED=$(printf '%s' "${REQUEST_HASH}${RESPONSE_HASH}${PAYMENT_ID}${TIMESTAMP}${BUYER}${SELLER}${UPSTREAM}${RECEIPT_HASH}" | sha256sum | cut -d' ' -f1)
 
 # 3. Compare
 EXPECTED=$(echo "$PROOF" | jq -r '.hashes.chain' | sed 's/sha256://')
@@ -190,6 +246,7 @@ If the chain hash matches, no field in the proof was altered after creation.
 - The request/response pair is authentic (hashes match)
 - The payment ID is bound to this specific execution
 - The timestamp is bound to this specific execution
+- The external receipt content (if present) is bound to this specific proof
 - No field was modified after proof creation
 
 ### What verification does NOT prove
@@ -239,7 +296,7 @@ pub.verify(b64url_decode(sig_b64), chain_hash.encode("utf-8"))
 
 ### What the signature covers vs. does not cover
 
-**Covered** (via the chain hash): `request_hash`, `response_hash`, `payment_intent_id`, `timestamp`, `buyer_fingerprint`, `seller`, `upstream_timestamp` (if present).
+**Covered** (via the chain hash): `request_hash`, `response_hash`, `payment_intent_id`, `timestamp`, `buyer_fingerprint`, `seller`, `upstream_timestamp` (if present), `receipt_content_hash` (if present).
 
 **Not covered** (mutable metadata): `views_count`, `identity_consistent`, `archive_org`, `timestamp_authority` status. These fields are informational and may change after proof creation.
 
@@ -257,8 +314,9 @@ A proof MAY be corroborated by independent witnesses:
 | **RFC 3161 Timestamp** | Proof existed at claimed time | Verify `.tsr` file via `openssl ts -verify` | All plans |
 | **Archive.org** | Proof page was publicly visible | Visit `archive_org.snapshot_url` | All plans |
 | **Stripe** | Payment occurred | Check `payment.transaction_id` on Stripe dashboard or API | Pro plan only |
+| **External Receipt** | Receipt content at time of proof | Fetch `payment_evidence.receipt_url`, hash content, compare to `receipt_content_hash` | When `payment_evidence` is present |
 
-Free tier proofs have 3 witnesses (Ed25519, RFC 3161, Archive.org). Pro proofs add Stripe as a 4th witness.
+Free tier proofs have 3 witnesses (Ed25519, RFC 3161, Archive.org). Pro proofs add Stripe as a 4th witness. Proofs with external payment evidence add the receipt as an additional witness.
 
 No witness is required for chain hash verification. Each adds an independent layer of trust.
 

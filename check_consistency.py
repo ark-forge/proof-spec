@@ -103,6 +103,8 @@ def check_test_vectors():
         )
         if inp.get("upstream_timestamp"):
             chain_input += inp["upstream_timestamp"]
+        if inp.get("receipt_content_hash"):
+            chain_input += inp["receipt_content_hash"]
 
         chain_hash = sha256(chain_input)
         if chain_hash != exp["chain_hash"]:
