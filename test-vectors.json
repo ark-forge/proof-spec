@@ -2,8 +2,8 @@
   "spec_version": "2.0.0",
   "algorithm": "SHA-256",
   "canonical_json_rule": "json.dumps(data, sort_keys=True, separators=(\",\", \":\"))",
-  "chain_formula": "SHA256(request_hash + response_hash + payment_intent_id + timestamp + buyer_fingerprint + seller [+ upstream_timestamp] [+ receipt_content_hash])",
-  "note": "buyer_fingerprint = SHA256(api_key). All concatenation uses raw strings, no separator. upstream_timestamp is appended only when present and non-null in the proof JSON. receipt_content_hash is appended only when payment_evidence.receipt_content_hash is present (stripped of sha256: prefix).",
+  "chain_formula": "SHA256(request_hash + response_hash + transaction_id + timestamp + buyer_fingerprint + seller [+ upstream_timestamp] [+ receipt_content_hash])",
+  "note": "transaction_id = payment.transaction_id from the proof JSON (pi_*, crd_*, or free_tier). buyer_fingerprint = SHA256(api_key). All concatenation uses raw strings, no separator. upstream_timestamp is appended only when present and non-null in the proof JSON. receipt_content_hash is appended only when payment_evidence.receipt_content_hash is present (stripped of sha256: prefix). In test vector inputs, the field is named payment_intent_id for historical reasons.",
   "vectors": [
     {
       "name": "minimal_transaction",
