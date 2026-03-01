@@ -85,6 +85,10 @@ Both variants produce a valid chain hash. The `transaction_id` value (`pi_...` o
 | `timestamp_authority` | object | TSA status, provider, download URL, and `tsr_base64` (base64-encoded .tsr file) |
 | `archive_org` | object | Archive.org snapshot status and URL |
 | `verification_algorithm` | string | URL to algorithm documentation |
+| `transaction_success` | bool | Whether the upstream service returned a success response (HTTP status < 400) |
+| `upstream_status_code` | int | HTTP status code returned by the upstream service |
+| `disputed` | bool | Whether this proof has been disputed. Set by the dispute system |
+| `dispute_id` | string | Reference to the dispute record (e.g. `disp_a1b2c3d4`). Set when disputed |
 
 ## 2. Chain hash algorithm
 
@@ -298,7 +302,7 @@ pub.verify(b64url_decode(sig_b64), chain_hash.encode("utf-8"))
 
 **Covered** (via the chain hash): `request_hash`, `response_hash`, `payment_intent_id`, `timestamp`, `buyer_fingerprint`, `seller`, `upstream_timestamp` (if present), `receipt_content_hash` (if present).
 
-**Not covered** (mutable metadata): `views_count`, `identity_consistent`, `archive_org`, `timestamp_authority` status. These fields are informational and may change after proof creation.
+**Not covered** (mutable metadata): `views_count`, `identity_consistent`, `archive_org`, `timestamp_authority` status, `transaction_success`, `upstream_status_code`, `disputed`, `dispute_id`. These fields are informational and may change after proof creation.
 
 ### Key distribution
 
