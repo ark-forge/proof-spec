@@ -129,7 +129,6 @@ All variants produce a valid chain hash. The `payment.transaction_id` value is u
 | `parties.agent_version` | string | Agent's version string |
 | `identity_consistent` | bool/null | Whether identity matches previous calls with same key |
 | `timestamp_authority` | object | TSA status, provider, download URL, and `tsr_base64` (base64-encoded .tsr file) |
-| `archive_org` | object | Archive.org snapshot status and URL |
 | `verification_algorithm` | string | URL to algorithm documentation |
 | `transaction_success` | bool | Whether the upstream service returned a success response (HTTP status < 400) |
 | `upstream_status_code` | int | HTTP status code returned by the upstream service |
@@ -309,7 +308,7 @@ If the chain hash matches, no chain-hash-bound field was altered after creation.
 - That the payment actually occurred (verify via Stripe API for Pro proofs; Free proofs have `payment.provider = "none"`)
 - That the timestamp is accurate (verify via RFC 3161 TSA)
 - That the response content is correct (verify via the service)
-- That mutable metadata fields (`identity_consistent`, `archive_org`, `timestamp_authority`, `transaction_success`, `upstream_status_code`, `disputed`, `dispute_id`) are unchanged — these are informational and may be updated after proof creation without affecting the chain hash
+- That mutable metadata fields (`identity_consistent`, `timestamp_authority`, `transaction_success`, `upstream_status_code`, `disputed`, `dispute_id`) are unchanged — these are informational and may be updated after proof creation without affecting the chain hash
 
 ## 6. Digital signature
 
@@ -354,7 +353,7 @@ pub.verify(b64url_decode(sig_b64), chain_hash.encode("utf-8"))
 
 **Covered** (via the chain hash): `hashes.request`, `hashes.response`, `payment.transaction_id`, `timestamp`, `parties.buyer_fingerprint`, `parties.seller`, `upstream_timestamp` (if present), `payment_evidence.receipt_content_hash` (if present).
 
-**Not covered** (mutable metadata): `identity_consistent`, `archive_org`, `timestamp_authority` status, `transaction_success`, `upstream_status_code`, `disputed`, `dispute_id`. These fields are informational and may change after proof creation.
+**Not covered** (mutable metadata): `identity_consistent`, `timestamp_authority` status, `transaction_success`, `upstream_status_code`, `disputed`, `dispute_id`. These fields are informational and may change after proof creation.
 
 ### Key distribution
 
@@ -368,11 +367,10 @@ A proof MAY be corroborated by independent witnesses:
 |---------|---------------|--------------|-------------|
 | **Ed25519 Signature** | Proof was issued by ArkForge | Verify `arkforge_signature` with `arkforge_pubkey` | All plans |
 | **RFC 3161 Timestamp** | Proof existed at claimed time | Verify `.tsr` file via `openssl ts -verify` | All plans |
-| **Archive.org** | Proof page was publicly visible | Visit `archive_org.snapshot_url` | All plans |
 | **Stripe** | Payment occurred | Check `payment.transaction_id` on Stripe dashboard or API | Pro plan only |
 | **External Receipt** | Receipt content at time of proof | Fetch `payment_evidence.receipt_url`, hash content, compare to `receipt_content_hash` | When `payment_evidence` is present |
 
-Free tier proofs have 3 witnesses (Ed25519, RFC 3161, Archive.org). Pro proofs add Stripe as a 4th witness. Proofs with external payment evidence add the receipt as an additional witness.
+Free tier proofs have 2 witnesses (Ed25519, RFC 3161). Pro proofs add Stripe as a 3rd witness. Proofs with external payment evidence add the receipt as an additional witness.
 
 No witness is required for chain hash verification. Each adds an independent layer of trust.
 
