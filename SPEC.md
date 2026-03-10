@@ -1,4 +1,4 @@
-# ArkForge Proof Specification v2.0.0
+# ArkForge Proof Specification v2.1.0
 
 An open standard for verifiable agent-to-agent execution proofs.
 
@@ -77,7 +77,7 @@ A conformant proof is a JSON object. The following fields are **required**:
 ```json
 {
   "proof_id": "prf_20260225_170950_fdec72",
-  "spec_version": "2.0",
+  "spec_version": "2.1",
   "timestamp": "2026-02-25T17:09:47Z",
   "hashes": {
     "request": "sha256:<hex>",
@@ -97,11 +97,14 @@ A conformant proof is a JSON object. The following fields are **required**:
   },
   "arkforge_signature": "ed25519:<base64url>",
   "arkforge_pubkey": "ed25519:<base64url>",
-  "verification_url": "https://arkforge.fr/trust/v1/proof/prf_20260225_170950_fdec72"
+  "verification_url": "https://arkforge.tech/trust/v1/proof/prf_20260225_170950_fdec72"
 }
 ```
 
-**Note:** proofs without `provider_payment` may use `spec_version: "1.1"` (backward compatible). Proofs with `provider_payment.receipt_content_hash` use `spec_version: "2.0"`.
+**Note:** `spec_version` indicates the chain hash algorithm used:
+- `"1.2"` (current): canonical JSON chain hash — see section 2
+- `"2.1"` (current + receipt): canonical JSON chain hash with `receipt_content_hash`
+- `"1.1"`, `"2.0"` (legacy): string concatenation — see section 2 backward compatibility
 
 ### Payment variants
 
@@ -124,7 +127,7 @@ All variants produce a valid chain hash. The `payment.transaction_id` value is u
 | `provider_payment` | object | External receipt verification (see section 2.1). `receipt_content_hash` **included in chain hash** when present |
 | `arkforge_signature` | string | Ed25519 signature of the chain hash. Format: `ed25519:<base64url_without_padding>` |
 | `arkforge_pubkey` | string | Ed25519 public key used for signing. Format: `ed25519:<base64url_without_padding>` |
-| `verification_url` | string | URL to verify and view the proof (e.g. `https://arkforge.fr/trust/v1/proof/<proof_id>`) |
+| `verification_url` | string | URL to verify and view the proof (e.g. `https://arkforge.tech/trust/v1/proof/<proof_id>`) |
 | `parties.agent_identity` | string | Agent's self-declared name |
 | `parties.agent_version` | string | Agent's version string |
 | `identity_consistent` | bool/null | Whether identity matches previous calls with same key |
@@ -140,10 +143,53 @@ All variants produce a valid chain hash. The `payment.transaction_id` value is u
 
 The chain hash binds every element of a transaction into a single verifiable seal.
 
-### Formula
+### Algorithm (spec_version "1.2" and "2.1" — current)
+
+The chain hash is computed by serializing all components into a canonical JSON object and hashing the result.
 
 ```
-chain_hash = SHA256(request_hash + response_hash + transaction_id + timestamp + buyer_fingerprint + seller [+ upstream_timestamp] [+ receipt_content_hash])
+chain_data = {
+  "buyer_fingerprint": <hex>,
+  "request_hash":      <hex>,
+  "response_hash":     <hex>,
+  "seller":            <string>,
+  "timestamp":         <ISO 8601 string>,
+  "transaction_id":    <string>,
+  // optional fields — only include when present and non-null:
+  "upstream_timestamp":    <string>,   // spec_version "1.2" with upstream
+  "receipt_content_hash":  <hex>,      // spec_version "2.1" — strip "sha256:" prefix
+}
+
+chain_hash = SHA256(canonical_json(chain_data))
+```
+
+Keys are sorted alphabetically (canonical JSON). Optional fields are included in the dict only when present and non-null.
+
+#### Reference implementation (Python)
+
+```python
+import json, hashlib
+
+def canonical_json(data: dict) -> str:
+    return json.dumps(data, sort_keys=True, separators=(",", ":"))
+
+def sha256_hex(s: str) -> str:
+    return hashlib.sha256(s.encode("utf-8")).hexdigest()
+
+chain_data = {
+    "buyer_fingerprint": buyer_fingerprint,
+    "request_hash":      request_hash,
+    "response_hash":     response_hash,
+    "seller":            seller,
+    "timestamp":         timestamp,
+    "transaction_id":    transaction_id,
+}
+if upstream_timestamp:
+    chain_data["upstream_timestamp"] = upstream_timestamp
+if receipt_content_hash:
+    chain_data["receipt_content_hash"] = receipt_content_hash.removeprefix("sha256:")
+
+chain_hash = sha256_hex(canonical_json(chain_data))
 ```
 
 ### Definitions
@@ -156,33 +202,26 @@ chain_hash = SHA256(request_hash + response_hash + transaction_id + timestamp + 
 | `timestamp` | `timestamp` | ISO 8601 UTC string (e.g. `2026-02-25T17:09:47Z`) |
 | `buyer_fingerprint` | `parties.buyer_fingerprint` | `SHA256(api_key)` — hash of the raw API key string |
 | `seller` | `parties.seller` | Target domain (e.g. `arkforge.fr`) |
-| `upstream_timestamp` | `upstream_timestamp` | Upstream service's HTTP `Date` header (optional — only included when the field is present and non-null) |
-| `receipt_content_hash` | `provider_payment.receipt_content_hash` | SHA-256 hex digest of raw receipt bytes (optional — only included when present). Strip the `sha256:` prefix before concatenation |
+| `upstream_timestamp` | `upstream_timestamp` | Upstream service's HTTP `Date` header. **Included in chain_data only when present and non-null** |
+| `receipt_content_hash` | `provider_payment.receipt_content_hash` | SHA-256 hex of raw receipt bytes. **Included in chain_data only when present**. Strip the `sha256:` prefix |
 
-### Concatenation
+### Backward compatibility (spec_version "1.1" and "2.0" — legacy)
 
-All values are concatenated as raw UTF-8 strings with **no separator** before hashing. Optional components are appended in order when present.
+Proofs with `spec_version` `"1.1"`, `"2.0"`, or absent use the **legacy string concatenation formula**:
 
 ```
-# Base formula (no optional fields):
 input = request_hash + response_hash + transaction_id + timestamp + buyer_fingerprint + seller
+       [+ upstream_timestamp if present]
+       [+ receipt_content_hash (stripped of "sha256:" prefix) if present]
 
-# With upstream_timestamp:
-input += upstream_timestamp
-
-# With receipt_content_hash (from provider_payment.receipt_content_hash, stripped of "sha256:" prefix):
-input += receipt_content_hash
-
-chain_hash = sha256(input.encode("utf-8")).hexdigest()
+chain_hash = SHA256(input.encode("utf-8")).hexdigest()
 ```
 
-### Backward compatibility
+Use `spec_version` to select the algorithm:
+- `"1.2"`, `"2.1"`: canonical JSON (current)
+- `"1.1"`, `"2.0"`, absent: string concatenation (legacy)
 
-Each optional component is discriminated by **presence of its field** in the proof JSON:
-- `upstream_timestamp`: if the field is absent or null, do not append. If present and non-null, append after `seller`.
-- `receipt_content_hash`: if `provider_payment.receipt_content_hash` is absent or null, do not append. If present, strip the `sha256:` prefix and append after `upstream_timestamp` (or after `seller` if `upstream_timestamp` is absent).
-
-Do **not** use `spec_version` for this decision (avoids string comparison pitfalls like `"1.10" < "1.9"`).
+**Why canonical JSON?** Variable-length string concatenation without separators creates preimage ambiguity: two different inputs can produce the same concatenated string (e.g. `"ab"+"cd"` = `"a"+"bcd"`). Canonical JSON eliminates this by encoding field boundaries explicitly.
 
 ## 2.1. Payment evidence (v2.0)
 
@@ -270,10 +309,48 @@ buyer_fingerprint = SHA256("mcp_test_example_key")
 
 ## 5. Independent verification
 
-Given a proof JSON, any party can verify the integrity of chain-hash-bound fields:
+Given a proof JSON, any party can verify the integrity of chain-hash-bound fields.
+
+First, determine the algorithm from `spec_version`:
+
+### Current algorithm (spec_version "1.2" / "2.1")
+
+```python
+import json, hashlib
+
+def canonical_json(d):
+    return json.dumps(d, sort_keys=True, separators=(",", ":"))
+
+def sha256_hex(s):
+    return hashlib.sha256(s.encode("utf-8")).hexdigest()
+
+proof = json.loads(open("proof.json").read())
+
+request_hash  = proof["hashes"]["request"].removeprefix("sha256:")
+response_hash = proof["hashes"]["response"].removeprefix("sha256:")
+
+chain_data = {
+    "buyer_fingerprint": proof["parties"]["buyer_fingerprint"],
+    "request_hash":      request_hash,
+    "response_hash":     response_hash,
+    "seller":            proof["parties"]["seller"],
+    "timestamp":         proof["timestamp"],
+    "transaction_id":    proof["payment"]["transaction_id"],
+}
+if proof.get("upstream_timestamp"):
+    chain_data["upstream_timestamp"] = proof["upstream_timestamp"]
+rcv = (proof.get("provider_payment") or {}).get("receipt_content_hash")
+if rcv:
+    chain_data["receipt_content_hash"] = rcv.removeprefix("sha256:")
+
+computed = sha256_hex(canonical_json(chain_data))
+expected = proof["hashes"]["chain"].removeprefix("sha256:")
+print("VERIFIED" if computed == expected else "TAMPERED")
+```
+
+### Legacy algorithm (spec_version "1.1" / "2.0" / absent)
 
 ```bash
-# 1. Extract components
 REQUEST_HASH=$(echo "$PROOF" | jq -r '.hashes.request' | sed 's/sha256://')
 RESPONSE_HASH=$(echo "$PROOF" | jq -r '.hashes.response' | sed 's/sha256://')
 PAYMENT_ID=$(echo "$PROOF" | jq -r '.payment.transaction_id')
@@ -283,13 +360,11 @@ SELLER=$(echo "$PROOF" | jq -r '.parties.seller')
 UPSTREAM=$(echo "$PROOF" | jq -r '.upstream_timestamp // empty')
 RECEIPT_HASH=$(echo "$PROOF" | jq -r '.provider_payment.receipt_content_hash // empty' | sed 's/sha256://')
 
-# 2. Recompute chain hash
 # Linux:
 COMPUTED=$(printf '%s' "${REQUEST_HASH}${RESPONSE_HASH}${PAYMENT_ID}${TIMESTAMP}${BUYER}${SELLER}${UPSTREAM}${RECEIPT_HASH}" | sha256sum | cut -d' ' -f1)
 # macOS:
-# COMPUTED=$(printf '%s' "${REQUEST_HASH}${RESPONSE_HASH}${PAYMENT_ID}${TIMESTAMP}${BUYER}${SELLER}${UPSTREAM}${RECEIPT_HASH}" | shasum -a 256 | cut -d' ' -f1)
+# COMPUTED=$(printf '%s' "..." | shasum -a 256 | cut -d' ' -f1)
 
-# 3. Compare
 EXPECTED=$(echo "$PROOF" | jq -r '.hashes.chain' | sed 's/sha256://')
 [ "$COMPUTED" = "$EXPECTED" ] && echo "VERIFIED" || echo "TAMPERED"
 ```

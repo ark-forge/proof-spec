@@ -31,7 +31,7 @@ Want to add yours? Open a PR.
 
 ## Test vectors
 
-[`test-vectors.json`](test-vectors.json) contains 7 test cases (minimal, empty, unicode, with_upstream_timestamp, free_tier, with_receipt_content_hash, with_upstream_and_receipt). Any conformant implementation MUST pass all vectors.
+[`test-vectors.json`](test-vectors.json) contains 9 test cases (7 legacy string-concatenation vectors + 2 canonical-JSON vectors for spec_version 1.2/2.1). Any conformant implementation MUST pass all vectors.
 
 ## Roadmap
 

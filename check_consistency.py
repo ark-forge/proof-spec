@@ -92,21 +92,45 @@ def check_test_vectors():
                 print(f"  expected: {expected}")
                 ok = False
 
-        # Chain hash
-        chain_input = (
-            req_hash
-            + resp_hash
-            + inp["payment_intent_id"]
-            + inp["timestamp"]
-            + buyer_fp
-            + inp["seller"]
-        )
-        if inp.get("upstream_timestamp"):
-            chain_input += inp["upstream_timestamp"]
-        if inp.get("receipt_content_hash"):
-            chain_input += inp["receipt_content_hash"]
+        # Chain hash — algorithm depends on vector's spec_version
+        algo = v.get("algorithm", "concatenation")
+        if algo == "canonical_json":
+            chain_data = {
+                "buyer_fingerprint": buyer_fp,
+                "request_hash": req_hash,
+                "response_hash": resp_hash,
+                "seller": inp["seller"],
+                "timestamp": inp["timestamp"],
+                "transaction_id": inp["payment_intent_id"],
+            }
+            if inp.get("upstream_timestamp"):
+                chain_data["upstream_timestamp"] = inp["upstream_timestamp"]
+            if inp.get("receipt_content_hash"):
+                chain_data["receipt_content_hash"] = inp["receipt_content_hash"]
+            # Verify canonical_chain_data if present
+            if "canonical_chain_data" in exp:
+                actual_canonical = canonical_json(chain_data)
+                if actual_canonical != exp["canonical_chain_data"]:
+                    print(f"FAIL [{name}]: canonical_chain_data mismatch")
+                    print(f"  got:      {actual_canonical}")
+                    print(f"  expected: {exp['canonical_chain_data']}")
+                    ok = False
+            chain_hash = sha256(canonical_json(chain_data))
+        else:
+            chain_input = (
+                req_hash
+                + resp_hash
+                + inp["payment_intent_id"]
+                + inp["timestamp"]
+                + buyer_fp
+                + inp["seller"]
+            )
+            if inp.get("upstream_timestamp"):
+                chain_input += inp["upstream_timestamp"]
+            if inp.get("receipt_content_hash"):
+                chain_input += inp["receipt_content_hash"]
+            chain_hash = sha256(chain_input)
 
-        chain_hash = sha256(chain_input)
         if chain_hash != exp["chain_hash"]:
             print(f"FAIL [{name}]: chain_hash mismatch")
             print(f"  got:      {chain_hash}")

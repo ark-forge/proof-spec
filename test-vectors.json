@@ -1,9 +1,10 @@
 {
-  "spec_version": "2.0.0",
+  "spec_version": "2.1.0",
   "algorithm": "SHA-256",
   "canonical_json_rule": "json.dumps(data, sort_keys=True, separators=(\",\", \":\"))",
-  "chain_formula": "SHA256(request_hash + response_hash + transaction_id + timestamp + buyer_fingerprint + seller [+ upstream_timestamp] [+ receipt_content_hash])",
-  "note": "transaction_id = payment.transaction_id from the proof JSON (pi_*, crd_*, or free_tier). buyer_fingerprint = SHA256(api_key). All concatenation uses raw strings, no separator. upstream_timestamp is appended only when present and non-null in the proof JSON. receipt_content_hash is appended only when provider_payment.receipt_content_hash is present (stripped of sha256: prefix). In test vector inputs, the field is named payment_intent_id for historical reasons.",
+  "chain_formula_current": "SHA256(canonical_json({buyer_fingerprint, request_hash, response_hash, seller, timestamp, transaction_id [, upstream_timestamp] [, receipt_content_hash]}))",
+  "chain_formula_legacy": "SHA256(request_hash + response_hash + transaction_id + timestamp + buyer_fingerprint + seller [+ upstream_timestamp] [+ receipt_content_hash])",
+  "note": "Vectors 1-7 use the LEGACY string-concatenation algorithm (spec_version 1.1/2.0). Vectors 8-9 use the CURRENT canonical-JSON algorithm (spec_version 1.2/2.1). transaction_id = payment.transaction_id from the proof JSON. buyer_fingerprint = SHA256(api_key). In test vector inputs, the field is named payment_intent_id for historical reasons.",
   "vectors": [
     {
       "name": "minimal_transaction",
@@ -181,6 +182,68 @@
         "response_hash": "bad7c7f7f632182e9d746c9a4a02aea5f526a6a76c5108c4a98a7c4823fdbef2",
         "buyer_fingerprint": "7c8f263e06d5ce4681f750ad64ede882a4ebd87de60f9ae0e6b06f0300645a11",
         "chain_hash": "9174e8414537ba3268367fd49c239ac509cde868791db4935ad3467f71a90974"
+      }
+    },
+    {
+      "name": "canonical_json_v1_2",
+      "algorithm": "canonical_json",
+      "spec_version": "1.2",
+      "note": "spec_version 1.2 — chain hash uses canonical JSON dict (sorted keys). No optional fields. Same inputs as minimal_transaction — chain_hash MUST differ from legacy vector.",
+      "input": {
+        "request": {
+          "repo_url": "https://github.com/example/app"
+        },
+        "response": {
+          "files_scanned": 42,
+          "frameworks": [
+            "openai"
+          ]
+        },
+        "payment_intent_id": "pi_test_abc123",
+        "timestamp": "2026-01-15T12:00:00Z",
+        "api_key": "mcp_test_example_key",
+        "seller": "arkforge.fr"
+      },
+      "expected": {
+        "canonical_request": "{\"repo_url\":\"https://github.com/example/app\"}",
+        "canonical_response": "{\"files_scanned\":42,\"frameworks\":[\"openai\"]}",
+        "request_hash": "0987aa49eb45583406b66c77ea6f35498bd318b81040bec9c54ab439114abe42",
+        "response_hash": "bad7c7f7f632182e9d746c9a4a02aea5f526a6a76c5108c4a98a7c4823fdbef2",
+        "buyer_fingerprint": "7c8f263e06d5ce4681f750ad64ede882a4ebd87de60f9ae0e6b06f0300645a11",
+        "canonical_chain_data": "{\"buyer_fingerprint\":\"7c8f263e06d5ce4681f750ad64ede882a4ebd87de60f9ae0e6b06f0300645a11\",\"request_hash\":\"0987aa49eb45583406b66c77ea6f35498bd318b81040bec9c54ab439114abe42\",\"response_hash\":\"bad7c7f7f632182e9d746c9a4a02aea5f526a6a76c5108c4a98a7c4823fdbef2\",\"seller\":\"arkforge.fr\",\"timestamp\":\"2026-01-15T12:00:00Z\",\"transaction_id\":\"pi_test_abc123\"}",
+        "chain_hash": "d37d4d5afab5f3c489fd1191f9823381ab02c4750ec3078e64680d63ea29fae3"
+      }
+    },
+    {
+      "name": "canonical_json_v2_1_upstream_and_receipt",
+      "algorithm": "canonical_json",
+      "spec_version": "2.1",
+      "note": "spec_version 2.1 — canonical JSON dict with upstream_timestamp + receipt_content_hash. Both optional fields included (sorted alphabetically in dict). Same base inputs as minimal_transaction.",
+      "input": {
+        "request": {
+          "repo_url": "https://github.com/example/app"
+        },
+        "response": {
+          "files_scanned": 42,
+          "frameworks": [
+            "openai"
+          ]
+        },
+        "payment_intent_id": "pi_test_abc123",
+        "timestamp": "2026-01-15T12:00:00Z",
+        "api_key": "mcp_test_example_key",
+        "seller": "arkforge.fr",
+        "upstream_timestamp": "Wed, 15 Jan 2026 12:00:01 GMT",
+        "receipt_content_hash": "af65b75f3901dfd0ed9590a009bf7283e318801e15733bf68403219967d4edb7"
+      },
+      "expected": {
+        "canonical_request": "{\"repo_url\":\"https://github.com/example/app\"}",
+        "canonical_response": "{\"files_scanned\":42,\"frameworks\":[\"openai\"]}",
+        "request_hash": "0987aa49eb45583406b66c77ea6f35498bd318b81040bec9c54ab439114abe42",
+        "response_hash": "bad7c7f7f632182e9d746c9a4a02aea5f526a6a76c5108c4a98a7c4823fdbef2",
+        "buyer_fingerprint": "7c8f263e06d5ce4681f750ad64ede882a4ebd87de60f9ae0e6b06f0300645a11",
+        "canonical_chain_data": "{\"buyer_fingerprint\":\"7c8f263e06d5ce4681f750ad64ede882a4ebd87de60f9ae0e6b06f0300645a11\",\"receipt_content_hash\":\"af65b75f3901dfd0ed9590a009bf7283e318801e15733bf68403219967d4edb7\",\"request_hash\":\"0987aa49eb45583406b66c77ea6f35498bd318b81040bec9c54ab439114abe42\",\"response_hash\":\"bad7c7f7f632182e9d746c9a4a02aea5f526a6a76c5108c4a98a7c4823fdbef2\",\"seller\":\"arkforge.fr\",\"timestamp\":\"2026-01-15T12:00:00Z\",\"transaction_id\":\"pi_test_abc123\",\"upstream_timestamp\":\"Wed, 15 Jan 2026 12:00:01 GMT\"}",
+        "chain_hash": "0ad9bb1baae5431ce793195bc6e89f8acd25d6de99a721abd44ed58989efaa4d"
       }
     }
   ]
