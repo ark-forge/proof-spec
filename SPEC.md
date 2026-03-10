@@ -484,8 +484,8 @@ Implementers MUST pass all test vectors to claim conformance.
 This spec follows [Semantic Versioning](https://semver.org/).
 
 - **Patch** (1.0.x): clarifications, typo fixes, new test vectors
-- **Minor** (1.x.0): new optional fields, new witnesses
-- **Major** (x.0.0): changes to chain hash algorithm or required fields
+- **Minor** (1.x.0): new optional fields, new witnesses, new chain hash algorithm (backward-compatible — old `spec_version` values remain verifiable)
+- **Major** (x.0.0): non-backward-compatible changes to chain hash algorithm, removal of required fields, or breaking changes to verification procedure
 
 ## License
 
