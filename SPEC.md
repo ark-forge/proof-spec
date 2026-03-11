@@ -97,7 +97,7 @@ A conformant proof is a JSON object. The following fields are **required**:
   },
   "arkforge_signature": "ed25519:<base64url>",
   "arkforge_pubkey": "ed25519:<base64url>",
-  "verification_url": "https://arkforge.tech/trust/v1/proof/prf_20260225_170950_fdec72"
+  "verification_url": "https://trust.arkforge.tech/v1/proof/prf_20260225_170950_fdec72"
 }
 ```
 
@@ -127,7 +127,7 @@ All variants produce a valid chain hash. The `payment.transaction_id` value is u
 | `provider_payment` | object | External receipt verification (see section 2.1). `receipt_content_hash` **included in chain hash** when present |
 | `arkforge_signature` | string | Ed25519 signature of the chain hash. Format: `ed25519:<base64url_without_padding>` |
 | `arkforge_pubkey` | string | Ed25519 public key used for signing. Format: `ed25519:<base64url_without_padding>` |
-| `verification_url` | string | URL to verify and view the proof (e.g. `https://arkforge.tech/trust/v1/proof/<proof_id>`) |
+| `verification_url` | string | URL to verify and view the proof (e.g. `https://trust.arkforge.tech/v1/proof/<proof_id>`) |
 | `parties.agent_identity` | string | Agent's self-declared name |
 | `parties.agent_version` | string | Agent's version string |
 | `identity_consistent` | bool/null | Whether identity matches previous calls with same key |
