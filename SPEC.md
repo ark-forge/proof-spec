@@ -479,7 +479,25 @@ See [`test-vectors.json`](test-vectors.json) for machine-readable test cases.
 
 Implementers MUST pass all test vectors to claim conformance.
 
-## 9. Versioning
+## 9. API Response Filtering
+
+Implementations MAY filter sensitive fields from public API responses while keeping the internal proof structure intact.
+
+When a proof is returned via an **unauthenticated** endpoint:
+
+- `parties` (buyer_fingerprint, seller, agent_identity) SHOULD be omitted
+- `certification_fee` amounts and receipt URLs SHOULD be omitted
+- `buyer_reputation_score` and `buyer_profile_url` SHOULD be omitted
+- `provider_payment`: only `type`, `receipt_content_hash`, and `verification_status` SHOULD be retained; `receipt_url` and `parsed_fields` SHOULD be omitted
+
+When a proof is returned via an **authenticated owner-only** endpoint:
+
+- All fields MAY be included
+- Ownership SHOULD be verified by comparing `sha256(api_key)` against `parties.buyer_fingerprint`
+
+**Note:** these filtering rules apply to API responses only. The stored proof structure is not affected; `verify_proof_integrity()` always operates on the full internal proof.
+
+## 10. Versioning
 
 This spec follows [Semantic Versioning](https://semver.org/).
 
