@@ -11,6 +11,13 @@ Versioning: [Semantic Versioning](https://semver.org/spec/v2.0.0.html)
 
 ---
 
+## [2.1.1] — 2026-03-23
+
+### Added
+- Section 6: document `GET /.well-known/did.json` as a second canonical key distribution endpoint — W3C DID Document (`did:web:trust.arkforge.tech`) with `Ed25519VerificationKey2020` and `publicKeyJwk`
+
+---
+
 ## [2.1.0] — 2026-03-11
 
 ### Added
