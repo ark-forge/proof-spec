@@ -1,4 +1,4 @@
-# ArkForge Proof Specification v2.1.0
+# ArkForge Proof Specification v2.1.1
 
 An open standard for verifiable agent-to-agent execution proofs.
 
@@ -433,7 +433,12 @@ pub.verify(b64url_decode(sig_b64), chain_hash.encode("utf-8"))
 
 ### Key distribution
 
-The issuer's public key is embedded in each proof (`arkforge_pubkey`) and served at `GET /v1/pubkey`. Verifiers SHOULD pin the public key from a trusted source rather than relying solely on the `arkforge_pubkey` field within the proof itself.
+The issuer's public key is embedded in each proof (`arkforge_pubkey`) and served at two canonical endpoints:
+
+- `GET /v1/pubkey` — JSON `{"pubkey": "ed25519:<base64url>", "algorithm": "Ed25519"}`
+- `GET /.well-known/did.json` — W3C DID Document (`did:web:trust.arkforge.tech`) with `Ed25519VerificationKey2020` and `publicKeyJwk` (kty=OKP, crv=Ed25519, x=`<base64url>`)
+
+Verifiers SHOULD pin the public key from a trusted source rather than relying solely on the `arkforge_pubkey` field within the proof itself. The DID Document can be resolved by any conformant `did:web` resolver.
 
 ## 7. Independent witnesses
 
