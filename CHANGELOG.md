@@ -9,6 +9,9 @@ Versioning: [Semantic Versioning](https://semver.org/spec/v2.0.0.html)
 
 ## [Unreleased]
 
+### Added
+- README: composability section documenting field mapping between proof-spec and Compliance Receipts v0.1 (qntm WG spec)
+
 ---
 
 ## [2.1.1] — 2026-03-23

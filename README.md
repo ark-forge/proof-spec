@@ -33,6 +33,24 @@ Want to add yours? Open a PR.
 
 [`test-vectors.json`](test-vectors.json) contains 9 test cases (7 legacy string-concatenation vectors + 2 canonical-JSON vectors for spec_version 1.2/2.1). Any conformant implementation MUST pass all vectors.
 
+## Composability
+
+The proof-spec is the cryptographic foundation for the [Compliance Receipts v0.1](https://github.com/corpollc/qntm/blob/main/specs/working-group/compliance-receipts.md) spec drafted by the [qntm Working Group](https://github.com/corpollc/qntm/tree/main/specs).
+
+Field mapping:
+
+| proof-spec field | Compliance Receipts v0.1 field | Notes |
+|-----------------|-------------------------------|-------|
+| `proof_id` | `receipt_id` | Same role: unique receipt identifier |
+| `hashes.request` | `input_hash` | SHA-256 of canonical JSON (identical algorithm) |
+| `hashes.response` | `output_hash` | SHA-256 of canonical JSON (identical algorithm) |
+| `timestamp` | `step.timestamp` | ISO 8601 UTC |
+| `parties.agent_identity` + DID endpoint | `step.agent_did` | `did:web:trust.arkforge.tech` resolves to the Ed25519 signing key |
+| `arkforge_signature` | `signature` | Ed25519 — signs the chain hash (proof-spec) vs. canonical receipt (CR v0.1) |
+| `hashes.chain` | no equivalent | Additional witness: binds payment + identity + request + response into one sealed hash |
+
+Fields in Compliance Receipts v0.1 with no proof-spec equivalent (`pipeline_id`, `step.index`, `step.role`, `previous_receipt_hash`, `policy`) are pipeline context provided by the calling agent, not derived by the proxy.
+
 ## Roadmap
 
 The proof format will evolve to support third-party provider attestations and multi-PSP payment verification. See the [Trust Layer roadmap](https://github.com/ark-forge/trust-layer/blob/main/ROADMAP.md) for the full architecture.
