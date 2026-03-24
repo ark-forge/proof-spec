@@ -1,5 +1,5 @@
 {
-  "spec_version": "2.1.1",
+  "spec_version": "2.1.2",
   "algorithm": "SHA-256",
   "canonical_json_rule": "json.dumps(data, sort_keys=True, separators=(\",\", \":\"))",
   "chain_formula_current": "SHA256(canonical_json({buyer_fingerprint, request_hash, response_hash, seller, timestamp, transaction_id [, upstream_timestamp] [, receipt_content_hash]}))",
