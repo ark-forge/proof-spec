@@ -9,8 +9,17 @@ Versioning: [Semantic Versioning](https://semver.org/spec/v2.0.0.html)
 
 ## [Unreleased]
 
+---
+
+## [2.1.2] — 2026-03-24
+
 ### Added
+- `parties.agent_identity_verified` optional bool field — `true` when `agent_identity` is a cryptographically verified DID bound to the API key via Ed25519 challenge-response. Absent if self-declared.
 - README: composability section documenting field mapping between proof-spec and Compliance Receipts v0.1 (qntm WG spec)
+
+### Changed
+- `parties.agent_identity` description clarified: documents DID binding override behaviour (verified DID takes precedence over caller-declared value)
+- Section 9: `agent_identity_verified` included in public unauthenticated responses
 
 ---
 
@@ -45,7 +54,9 @@ Versioning: [Semantic Versioning](https://semver.org/spec/v2.0.0.html)
 - Ed25519 signature by independent third party
 - RFC 3161 timestamp
 
-[Unreleased]: https://github.com/ark-forge/proof-spec/compare/v2.1.0...HEAD
+[Unreleased]: https://github.com/ark-forge/proof-spec/compare/v2.1.2...HEAD
+[2.1.2]: https://github.com/ark-forge/proof-spec/compare/v2.1.1...v2.1.2
+[2.1.1]: https://github.com/ark-forge/proof-spec/compare/v2.1.0...v2.1.1
 [2.1.0]: https://github.com/ark-forge/proof-spec/compare/v1.2.0...v2.1.0
 [1.2.0]: https://github.com/ark-forge/proof-spec/compare/v1.0.0...v1.2.0
 [1.0.0]: https://github.com/ark-forge/proof-spec/releases/tag/v1.0.0

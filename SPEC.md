@@ -1,4 +1,4 @@
-# ArkForge Proof Specification v2.1.1
+# ArkForge Proof Specification v2.1.2
 
 An open standard for verifiable agent-to-agent execution proofs.
 
@@ -128,7 +128,8 @@ All variants produce a valid chain hash. The `payment.transaction_id` value is u
 | `arkforge_signature` | string | Ed25519 signature of the chain hash. Format: `ed25519:<base64url_without_padding>` |
 | `arkforge_pubkey` | string | Ed25519 public key used for signing. Format: `ed25519:<base64url_without_padding>` |
 | `verification_url` | string | URL to verify and view the proof (e.g. `https://trust.arkforge.tech/v1/proof/<proof_id>`) |
-| `parties.agent_identity` | string | Agent's self-declared name |
+| `parties.agent_identity` | string | Agent identity. If the API key has a cryptographically verified DID bound via Ed25519 challenge-response, this field contains the verified DID and takes precedence over any caller-declared value. Otherwise, contains the caller's self-declared name. |
+| `parties.agent_identity_verified` | bool | `true` if `agent_identity` is a cryptographically verified DID bound to the API key. Absent if the identity is self-declared. |
 | `parties.agent_version` | string | Agent's version string |
 | `identity_consistent` | bool/null | Whether identity matches previous calls with same key |
 | `timestamp_authority` | object | TSA status, provider, download URL, and `tsr_base64` (base64-encoded .tsr file) |
@@ -491,7 +492,7 @@ Implementations MAY filter sensitive fields from public API responses while keep
 When a proof is returned via an **unauthenticated** endpoint:
 
 - `parties.buyer_fingerprint` SHOULD be omitted (privacy)
-- `parties.agent_identity` and `parties.seller` SHOULD be included (third-party auditability)
+- `parties.agent_identity`, `parties.agent_identity_verified`, and `parties.seller` SHOULD be included (third-party auditability)
 - `certification_fee` amounts and receipt URLs SHOULD be omitted
 - `buyer_reputation_score` and `buyer_profile_url` SHOULD be omitted
 - `provider_payment`: only `type`, `receipt_content_hash`, and `verification_status` SHOULD be retained; `receipt_url` and `parsed_fields` SHOULD be omitted
