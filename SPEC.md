@@ -1,4 +1,4 @@
-# ArkForge Proof Specification v2.1.2
+# ArkForge Proof Specification v2.1.3
 
 An open standard for verifiable agent-to-agent execution proofs.
 
