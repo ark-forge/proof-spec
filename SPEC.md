@@ -490,7 +490,8 @@ Implementations MAY filter sensitive fields from public API responses while keep
 
 When a proof is returned via an **unauthenticated** endpoint:
 
-- `parties` (buyer_fingerprint, seller, agent_identity) SHOULD be omitted
+- `parties.buyer_fingerprint` SHOULD be omitted (privacy)
+- `parties.agent_identity` and `parties.seller` SHOULD be included (third-party auditability)
 - `certification_fee` amounts and receipt URLs SHOULD be omitted
 - `buyer_reputation_score` and `buyer_profile_url` SHOULD be omitted
 - `provider_payment`: only `type`, `receipt_content_hash`, and `verification_status` SHOULD be retained; `receipt_url` and `parsed_fields` SHOULD be omitted
