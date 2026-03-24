@@ -45,7 +45,7 @@ Field mapping:
 | `hashes.request` | `input_hash` | SHA-256 of canonical JSON (identical algorithm) |
 | `hashes.response` | `output_hash` | SHA-256 of canonical JSON (identical algorithm) |
 | `timestamp` | `step.timestamp` | ISO 8601 UTC |
-| `parties.agent_identity` + DID endpoint | `step.agent_did` | `did:web:trust.arkforge.tech` resolves to the Ed25519 signing key |
+| `parties.agent_identity` + `parties.agent_identity_verified` + DID endpoint | `step.agent_did` | `agent_identity` carries the verified DID when `agent_identity_verified: true`; `did:web:trust.arkforge.tech` resolves to the Ed25519 signing key |
 | `arkforge_signature` | `signature` | Ed25519 — signs the chain hash (proof-spec) vs. canonical receipt (CR v0.1) |
 | `hashes.chain` | no equivalent | Additional witness: binds payment + identity + request + response into one sealed hash |
 
