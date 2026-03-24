@@ -11,6 +11,13 @@ Versioning: [Semantic Versioning](https://semver.org/spec/v2.0.0.html)
 
 ---
 
+## [2.1.3] — 2026-03-24
+
+### Added
+- `parties.did_resolution_status` optional string field. Values: `"bound"` (DID verified via Ed25519 challenge-response at registration time), `"unverified"` (caller-declared identity without cryptographic verification). Absent if no `agent_identity` is provided. Included in public unauthenticated proof responses.
+
+---
+
 ## [2.1.2] — 2026-03-24
 
 ### Added

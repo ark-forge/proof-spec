@@ -130,6 +130,7 @@ All variants produce a valid chain hash. The `payment.transaction_id` value is u
 | `verification_url` | string | URL to verify and view the proof (e.g. `https://trust.arkforge.tech/v1/proof/<proof_id>`) |
 | `parties.agent_identity` | string | Agent identity. If the API key has a cryptographically verified DID bound via Ed25519 challenge-response, this field contains the verified DID and takes precedence over any caller-declared value. Otherwise, contains the caller's self-declared name. |
 | `parties.agent_identity_verified` | bool | `true` if `agent_identity` is a cryptographically verified DID bound to the API key. Absent if the identity is self-declared. |
+| `parties.did_resolution_status` | string | DID resolution status at proof creation time. `"bound"` if `agent_identity` is a cryptographically verified DID bound via Ed25519 challenge-response at registration time. `"unverified"` if `agent_identity` is caller-declared without cryptographic verification. Absent if no `agent_identity` is provided. |
 | `parties.agent_version` | string | Agent's version string |
 | `identity_consistent` | bool/null | Whether identity matches previous calls with same key |
 | `timestamp_authority` | object | TSA status, provider, download URL, and `tsr_base64` (base64-encoded .tsr file) |
@@ -492,7 +493,7 @@ Implementations MAY filter sensitive fields from public API responses while keep
 When a proof is returned via an **unauthenticated** endpoint:
 
 - `parties.buyer_fingerprint` SHOULD be omitted (privacy)
-- `parties.agent_identity`, `parties.agent_identity_verified`, and `parties.seller` SHOULD be included (third-party auditability)
+- `parties.agent_identity`, `parties.agent_identity_verified`, `parties.did_resolution_status`, and `parties.seller` SHOULD be included (third-party auditability)
 - `certification_fee` amounts and receipt URLs SHOULD be omitted
 - `buyer_reputation_score` and `buyer_profile_url` SHOULD be omitted
 - `provider_payment`: only `type`, `receipt_content_hash`, and `verification_status` SHOULD be retained; `receipt_url` and `parsed_fields` SHOULD be omitted
