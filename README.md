@@ -51,6 +51,10 @@ Field mapping:
 
 Fields in Compliance Receipts v0.1 with no proof-spec equivalent (`pipeline_id`, `step.index`, `step.role`, `previous_receipt_hash`, `policy`) are pipeline context provided by the calling agent, not derived by the proxy.
 
+### OM World Execution Proof
+
+[OM World's per-step Execution Proof](https://github.com/omworldprotocol/om-world/blob/main/docs/execution-proof.md) composes with proof-spec and CR v0.1 via the chained `prev_hash` mechanism: `previous_receipt_hash` (CR v0.1) is structurally equivalent to OM World's `prev_hash`, and `step.timestamp` maps directly. See [`OM-WORLD-COMPOSABILITY.md`](OM-WORLD-COMPOSABILITY.md) for the full field mapping, the canonical `step_hash` formula, and the JSON examples for the stateless vs. stateful `context_hash` edge case.
+
 ## Roadmap
 
 The proof format will evolve to support third-party provider attestations and multi-PSP payment verification. See the [Trust Layer roadmap](https://github.com/ark-forge/trust-layer/blob/main/ROADMAP.md) for the full architecture.
