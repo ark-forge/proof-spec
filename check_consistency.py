@@ -71,6 +71,9 @@ def inclusion_root(leaf: bytes, index: int, size: int, path):
     return h, i
 
 
+IDENTITY_FIELDS = ("agent_identity", "agent_identity_verified", "did_resolution_status")
+
+
 def commitments_root(commitments: dict) -> str:
     """Spec 3.0 chain hash: Merkle root over the commitments, fields sorted."""
     return merkle_root([leaf_hash(bytes.fromhex(commitments[f]))
@@ -181,6 +184,10 @@ def check_test_vectors():
                 chain_data["upstream_timestamp"] = inp["upstream_timestamp"]
             if inp.get("receipt_content_hash"):
                 chain_data["receipt_content_hash"] = inp["receipt_content_hash"]
+            if v.get("spec_version") == "3.1":
+                # Committed unconditionally: an absent identity is a committed null.
+                for field in IDENTITY_FIELDS:
+                    chain_data[field] = inp[field]
             if chain_data != exp["chain_data"]:
                 print(f"FAIL [{name}]: chain_data mismatch")
                 ok = False
@@ -195,6 +202,20 @@ def check_test_vectors():
                 ok = False
                 continue
             chain_hash = commitments_root(commitments)
+            # Spec 3.1 publishes the identity nonces. If they stopped opening their
+            # commitments, an unbacked identity would read as an anchored one.
+            if v.get("spec_version") == "3.1":
+                published = exp.get("published_nonces") or {}
+                if set(published) != set(IDENTITY_FIELDS):
+                    print(f"FAIL [{name}]: published_nonces must cover exactly the identity triple")
+                    ok = False
+                    continue
+                bad = [f for f in IDENTITY_FIELDS
+                       if commit(f, published[f], chain_data[f]) != exp["commitments"][f]]
+                if bad:
+                    print(f"FAIL [{name}]: published nonce does not open {', '.join(bad)}")
+                    ok = False
+                    continue
         elif algo == "canonical_json":
             chain_data = {
                 "buyer_fingerprint": buyer_fp,

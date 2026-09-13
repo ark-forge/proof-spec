@@ -31,7 +31,7 @@ Want to add yours? Open a PR.
 
 ## Test vectors
 
-[`test-vectors.json`](test-vectors.json) contains 12 test cases (7 legacy string-concatenation vectors, 2 canonical-JSON vectors for spec_version 1.2/2.1, 2 per-field commitment vectors for spec_version 3.0, and 1 batch-anchor Merkle vector). Any conformant implementation MUST pass all vectors.
+[`test-vectors.json`](test-vectors.json) contains 14 test cases (7 legacy string-concatenation vectors, 2 canonical-JSON vectors for spec_version 1.2/2.1, 2 per-field commitment vectors for spec_version 3.0, 1 batch-anchor Merkle vector, and 2 spec_version 3.1 vectors covering the committed and publicly opened identity triple). Any conformant implementation MUST pass all vectors.
 
 ## Composability
 
