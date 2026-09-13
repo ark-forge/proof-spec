@@ -11,6 +11,40 @@ Versioning: [Semantic Versioning](https://semver.org/spec/v2.0.0.html)
 
 ---
 
+## [3.0.0] — 2026-09-13
+
+### Changed
+- **BREAKING (new proofs only): `hashes.chain` is now the RFC 6962 Merkle root of one
+  commitment per chain field**, `SHA256(field || 0x00 || nonce || canonical_json(value))`,
+  with 32 fresh random bytes of nonce per field and per proof. Proofs published under
+  spec_version `"1.1"`, `"1.2"`, `"2.0"` and `"2.1"` keep their own algorithm: nothing is
+  recomputed or re-anchored retroactively.
+
+  The reason is third-party verifiability. Up to 2.1 the chain hash was computed over the
+  values, and a public proof redacts `transaction_id` and `buyer_fingerprint` — so a third
+  party could not recompute the anchored hash, and the published procedure reported
+  TAMPERED against an honest issuer. A proof now publishes every commitment and no value.
+- `spec_version` is no longer informational: it selects the chain hash algorithm.
+
+### Added
+- `commitments`: one commitment per committed field, published in full.
+- **Selective disclosure**: the owner opens any single field by handing over its
+  `(nonce, value)` pair out of band; the counterparty checks it against the published
+  commitment. Field name and per-field nonce are in the preimage, so a commitment cannot
+  be moved between fields and disclosing one field reveals nothing about a low-entropy
+  neighbour.
+- **Section 2.2 — batch anchoring**: external anchors MAY cover the Merkle root of a batch
+  of proofs, each proof carrying its own inclusion proof (`batch_anchor`). Verifiers MUST
+  check the audit path length against the length `tree_size` requires — an overstated
+  `tree_size` is otherwise accepted, the walk reaching the real root and stopping early.
+- **Pending state**: a proof whose batch has not closed has no external anchor.
+  `batch_anchor.status: "pending"` MUST be reported as waiting, never as tampering.
+- Test vectors 10-12: two per-field commitment vectors with fixed nonces, one batch-anchor
+  vector with the root and an inclusion path per leaf. `check_consistency.py` recomputes
+  all three from an independent implementation of the primitives.
+
+---
+
 ## [2.1.3] — 2026-03-24
 
 ### Added

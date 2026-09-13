@@ -1,4 +1,4 @@
-# ArkForge Proof Specification v2.1.3
+# ArkForge Proof Specification v3.0.0
 
 An open standard for verifiable agent-to-agent execution proofs.
 
@@ -39,6 +39,7 @@ A conformant proof is a JSON object. The following fields are **required**:
 | `hashes.request` | string | SHA-256 hash of canonical JSON request. Format: `sha256:<hex>` |
 | `hashes.response` | string | SHA-256 hash of canonical JSON response. Format: `sha256:<hex>` |
 | `hashes.chain` | string | Chain hash binding all components. Format: `sha256:<hex>` |
+| `commitments` | object | One commitment per committed field, `field -> sha256:<hex>` (spec_version `"3.0"`) |
 | `parties.buyer_fingerprint` | string | SHA-256 hash of the buyer's API key (hex) |
 | `parties.seller` | string | Target service domain (e.g. `arkforge.fr`) |
 | `payment.provider` | string | Payment provider identifier (see Payment variants) |
@@ -57,6 +58,14 @@ A conformant proof is a JSON object. The following fields are **required**:
     "request": "sha256:<hex>",
     "response": "sha256:<hex>",
     "chain": "sha256:<hex>"
+  },
+  "commitments": {
+    "buyer_fingerprint": "sha256:<hex>",
+    "request_hash": "sha256:<hex>",
+    "response_hash": "sha256:<hex>",
+    "seller": "sha256:<hex>",
+    "timestamp": "sha256:<hex>",
+    "transaction_id": "sha256:<hex>"
   },
   "parties": {
     "buyer_fingerprint": "<hex>",
@@ -77,12 +86,28 @@ A conformant proof is a JSON object. The following fields are **required**:
 ```json
 {
   "proof_id": "prf_20260225_170950_fdec72",
-  "spec_version": "2.1",
+  "spec_version": "3.0",
   "timestamp": "2026-02-25T17:09:47Z",
   "hashes": {
     "request": "sha256:<hex>",
     "response": "sha256:<hex>",
     "chain": "sha256:<hex>"
+  },
+  "commitments": {
+    "buyer_fingerprint": "sha256:<hex>",
+    "request_hash": "sha256:<hex>",
+    "response_hash": "sha256:<hex>",
+    "seller": "sha256:<hex>",
+    "timestamp": "sha256:<hex>",
+    "transaction_id": "sha256:<hex>"
+  },
+  "batch_anchor": {
+    "status": "anchored",
+    "batch_id": "batch_20260913_132956_516",
+    "leaf_index": 0,
+    "tree_size": 4,
+    "audit_path": ["<hex>", "<hex>"],
+    "root": "sha256:<hex>"
   },
   "parties": {
     "buyer_fingerprint": "<hex>",
@@ -102,9 +127,9 @@ A conformant proof is a JSON object. The following fields are **required**:
 ```
 
 **Note:** `spec_version` indicates the chain hash algorithm used:
-- `"1.2"` (current): canonical JSON chain hash — see section 2
-- `"2.1"` (current + receipt): canonical JSON chain hash with `receipt_content_hash`
-- `"1.1"`, `"2.0"` (legacy): string concatenation — see section 2 backward compatibility
+- `"3.0"` (current): Merkle root of per-field commitments — see section 2
+- `"1.2"`, `"2.1"`: canonical JSON over the values themselves — see section 2 backward compatibility
+- `"1.1"`, `"2.0"` (legacy): string concatenation — same section
 
 ### Payment variants
 
@@ -122,7 +147,8 @@ All variants produce a valid chain hash. The `payment.transaction_id` value is u
 
 | Field | Type | Description |
 |-------|------|-------------|
-| `spec_version` | string | Proof format version (`"1.1"` or `"2.0"`). Informational for auditors |
+| `spec_version` | string | Proof format version (`"3.0"`, `"2.1"`, `"1.2"`, `"1.1"`, `"2.0"`). Selects the chain hash algorithm — **not** informational |
+| `batch_anchor` | object | Inclusion proof from this chain hash up to the anchored batch root — see section 2.2 |
 | `upstream_timestamp` | string | Upstream service's HTTP `Date` header (RFC 7231 format). **Included in chain hash** when present |
 | `provider_payment` | object | External receipt verification (see section 2.1). `receipt_content_hash` **included in chain hash** when present |
 | `arkforge_signature` | string | Ed25519 signature of the chain hash. Format: `ed25519:<base64url_without_padding>` |
@@ -145,54 +171,94 @@ All variants produce a valid chain hash. The `payment.transaction_id` value is u
 
 The chain hash binds every element of a transaction into a single verifiable seal.
 
-### Algorithm (spec_version "1.2" and "2.1" — current)
+### Algorithm (spec_version "3.0" — current)
 
-The chain hash is computed by serializing all components into a canonical JSON object and hashing the result.
+Each chain field is committed to separately, and the chain hash is the RFC 6962 Merkle
+root of those commitments:
 
 ```
-chain_data = {
-  "buyer_fingerprint": <hex>,
-  "request_hash":      <hex>,
-  "response_hash":     <hex>,
-  "seller":            <string>,
-  "timestamp":         <ISO 8601 string>,
-  "transaction_id":    <string>,
-  // optional fields — only include when present and non-null:
-  "upstream_timestamp":    <string>,   // spec_version "1.2" with upstream
-  "receipt_content_hash":  <hex>,      // spec_version "2.1" — strip "sha256:" prefix
-}
+commitment(field) = SHA256(field_name || 0x00 || nonce || canonical_json(value))
 
-chain_hash = SHA256(canonical_json(chain_data))
+chain_hash = MerkleRootRFC6962([ leaf(commitment(f)) for f in sorted(fields) ])
+  leaf(x)       = SHA256(0x00 || x)
+  node(l, r)    = SHA256(0x01 || l || r)
 ```
 
-Keys are sorted alphabetically (canonical JSON). Optional fields are included in the dict only when present and non-null.
+- `field_name` is the UTF-8 field name, followed by a single `0x00` byte. It is in the
+  preimage so that a commitment cannot be moved from one field to another during a
+  partial disclosure.
+- `nonce` is **32 fresh random bytes, drawn per field and per proof**. Per field, so
+  that disclosing one field does not let anyone brute-force a low-entropy neighbour
+  (an amount, a domain). Per proof, so that two proofs over the same value do not
+  produce equal commitments that link them.
+- `value` is encoded with `canonical_json`, never `str()`: `100` and `"100"` must not
+  open the same commitment.
+- Leaves are ordered by field name, which a verifier reconstructs from the published
+  commitments alone. There is no separate ordering to publish or to trust.
+
+**Why commitments?** Up to spec 2.1 the chain hash was computed over the field values
+themselves. A public proof redacts `transaction_id` and `buyer_fingerprint`, so a third
+party could not recompute the anchored hash at all — the published verification
+procedure either skipped the check or reported TAMPERED against an honest issuer. With
+per-field commitments the proof publishes every commitment and no value: the anchored
+hash is recomputable from public data, and nothing that was private becomes public.
+
+### Fields committed
+
+The committed set is unchanged from spec 2.1:
+
+```
+request_hash, response_hash, transaction_id, timestamp, buyer_fingerprint, seller
+[+ upstream_timestamp]      when present and non-null
+[+ receipt_content_hash]    when present, stripped of its "sha256:" prefix
+```
 
 #### Reference implementation (Python)
 
 ```python
-import json, hashlib
+import json, hashlib, secrets
 
-def canonical_json(data: dict) -> str:
+def canonical_json(data) -> str:
     return json.dumps(data, sort_keys=True, separators=(",", ":"))
 
-def sha256_hex(s: str) -> str:
-    return hashlib.sha256(s.encode("utf-8")).hexdigest()
+def commit(field: str, nonce: bytes, value) -> bytes:
+    return hashlib.sha256(field.encode("utf-8") + b"\x00" + nonce
+                          + canonical_json(value).encode("utf-8")).digest()
 
-chain_data = {
-    "buyer_fingerprint": buyer_fingerprint,
-    "request_hash":      request_hash,
-    "response_hash":     response_hash,
-    "seller":            seller,
-    "timestamp":         timestamp,
-    "transaction_id":    transaction_id,
-}
-if upstream_timestamp:
-    chain_data["upstream_timestamp"] = upstream_timestamp
-if receipt_content_hash:
-    chain_data["receipt_content_hash"] = receipt_content_hash.removeprefix("sha256:")
+def leaf(x: bytes) -> bytes:   return hashlib.sha256(b"\x00" + x).digest()
+def node(l: bytes, r: bytes) -> bytes: return hashlib.sha256(b"\x01" + l + r).digest()
 
-chain_hash = sha256_hex(canonical_json(chain_data))
+def merkle_root(leaves):
+    # RFC 6962: the odd node is promoted, never duplicated. Duplicating it (the
+    # Bitcoin shape, CVE-2012-2459) lets two different leaf sets share a root.
+    if len(leaves) == 1:
+        return leaves[0]
+    k = 1
+    while k * 2 < len(leaves):
+        k *= 2
+    return node(merkle_root(leaves[:k]), merkle_root(leaves[k:]))
+
+nonces      = {f: secrets.token_bytes(32) for f in chain_data}
+commitments = {f: commit(f, nonces[f], v).hex() for f, v in chain_data.items()}
+chain_hash  = merkle_root([leaf(bytes.fromhex(commitments[f]))
+                           for f in sorted(commitments)]).hex()
 ```
+
+### Selective disclosure
+
+The proof owner holds the nonces. To prove one field to a counterparty without revealing
+any other, the owner hands over that field's `(nonce, value)` pair out of band. The
+counterparty recomputes `commitment(field)` and compares it with the commitment published
+in the proof — which is already covered by the anchored chain hash.
+
+```python
+recomputed = commit(field, bytes.fromhex(nonce), value).hex()
+assert recomputed == proof["commitments"][field]
+```
+
+Nothing about the undisclosed fields follows: each carries its own independent 32-byte
+nonce. There is no disclosure endpoint and no signed disclosure format — the anchored
+commitment is what makes the pair self-sufficient.
 
 ### Definitions
 
@@ -204,26 +270,86 @@ chain_hash = sha256_hex(canonical_json(chain_data))
 | `timestamp` | `timestamp` | ISO 8601 UTC string (e.g. `2026-02-25T17:09:47Z`) |
 | `buyer_fingerprint` | `parties.buyer_fingerprint` | `SHA256(api_key)` — hash of the raw API key string |
 | `seller` | `parties.seller` | Target domain (e.g. `arkforge.fr`) |
-| `upstream_timestamp` | `upstream_timestamp` | Upstream service's HTTP `Date` header. **Included in chain_data only when present and non-null** |
-| `receipt_content_hash` | `provider_payment.receipt_content_hash` | SHA-256 hex of raw receipt bytes. **Included in chain_data only when present**. Strip the `sha256:` prefix |
+| `upstream_timestamp` | `upstream_timestamp` | Upstream service's HTTP `Date` header. **Committed only when present and non-null** |
+| `receipt_content_hash` | `provider_payment.receipt_content_hash` | SHA-256 hex of raw receipt bytes. **Committed only when present**. Strip the `sha256:` prefix |
+| `commitments` | `commitments` | One hex commitment per committed field, published in full |
 
-### Backward compatibility (spec_version "1.1" and "2.0" — legacy)
+### Backward compatibility
 
-Proofs with `spec_version` `"1.1"`, `"2.0"`, or absent use the **legacy string concatenation formula**:
+`spec_version` selects the algorithm. Earlier proofs keep theirs; nothing is recomputed
+or re-anchored retroactively.
+
+| `spec_version` | Chain hash |
+|---|---|
+| `"3.0"` | Merkle root of per-field commitments (current) |
+| `"1.2"`, `"2.1"` | `SHA256(canonical_json(chain_data))` over the **values** |
+| `"1.1"`, `"2.0"`, absent | `SHA256` of the values concatenated as raw UTF-8, no separator (legacy) |
+
+**Values algorithm (spec_version "1.2" and "2.1")**
+
+```
+chain_data = {
+  "buyer_fingerprint": <hex>, "request_hash": <hex>, "response_hash": <hex>,
+  "seller": <string>, "timestamp": <ISO 8601>, "transaction_id": <string>,
+  // optional, only when present and non-null:
+  "upstream_timestamp": <string>, "receipt_content_hash": <hex>,
+}
+chain_hash = SHA256(canonical_json(chain_data))
+```
+
+**Legacy algorithm (spec_version "1.1", "2.0", absent)**
 
 ```
 input = request_hash + response_hash + transaction_id + timestamp + buyer_fingerprint + seller
        [+ upstream_timestamp if present]
        [+ receipt_content_hash (stripped of "sha256:" prefix) if present]
-
 chain_hash = SHA256(input.encode("utf-8")).hexdigest()
 ```
 
-Use `spec_version` to select the algorithm:
-- `"1.2"`, `"2.1"`: canonical JSON (current)
-- `"1.1"`, `"2.0"`, absent: string concatenation (legacy)
+**Why not raw concatenation?** Variable-length string concatenation without separators
+creates preimage ambiguity: two different inputs can produce the same concatenated
+string (e.g. `"ab"+"cd"` = `"a"+"bcd"`). Canonical JSON eliminated that in spec 1.2;
+per-field commitments keep it and add third-party verifiability on top.
 
-**Why canonical JSON?** Variable-length string concatenation without separators creates preimage ambiguity: two different inputs can produce the same concatenated string (e.g. `"ab"+"cd"` = `"a"+"bcd"`). Canonical JSON eliminates this by encoding field boundaries explicitly.
+## 2.2. Batch anchoring
+
+External anchors — an RFC 3161 timestamp and a Sigstore Rekor entry — MAY cover a
+**batch** of proofs rather than a single one. Chain hashes accumulate, and the anchored
+artefact is the RFC 6962 Merkle root over them, same primitive as the chain hash one
+level down:
+
+```
+batch_root = MerkleRootRFC6962([ leaf(chain_hash_bytes) for each proof in the batch ])
+```
+
+Each proof then carries its own inclusion proof down from that root:
+
+```json
+"batch_anchor": {
+  "status": "anchored",
+  "batch_id": "batch_20260913_132956_516",
+  "leaf_index": 0,
+  "tree_size": 4,
+  "audit_path": ["<hex>", "<hex>"],
+  "root": "sha256:<hex>"
+}
+```
+
+A verifier walks the path from its leaf to the claimed root (RFC 6962 §2.1.1), then
+checks the external anchors against **that root** rather than against the chain hash.
+
+Three checks are not optional:
+
+- the walk must reach the claimed root;
+- `leaf_index` must lie in `[0, tree_size)`;
+- `len(audit_path)` must equal the length a tree of `tree_size` requires for
+  `leaf_index` — that length is deterministic. Without it, an overstated `tree_size` is
+  accepted: the walk consumes the real siblings, reaches the real root and stops early,
+  with every other check satisfied.
+
+**Pending state.** Between issuance and batch close a proof has no external anchor.
+`batch_anchor.status` is then `"pending"`, and a verifier MUST report that as waiting,
+never as tampering. A proof that is merely waiting is not a forged one.
 
 ## 2.1. Payment evidence (v2.0)
 
@@ -315,7 +441,40 @@ Given a proof JSON, any party can verify the integrity of chain-hash-bound field
 
 First, determine the algorithm from `spec_version`:
 
-### Current algorithm (spec_version "1.2" / "2.1")
+### Current algorithm (spec_version "3.0")
+
+No field value is needed: the commitments are published and the chain hash is their
+Merkle root.
+
+```python
+import json, hashlib
+
+proof = json.loads(open("proof.json").read())
+c = proof["commitments"]
+
+def leaf(x):    return hashlib.sha256(b"\x00" + x).digest()
+def node(l, r): return hashlib.sha256(b"\x01" + l + r).digest()
+
+def merkle_root(leaves):
+    if len(leaves) == 1:
+        return leaves[0]
+    k = 1
+    while k * 2 < len(leaves):
+        k *= 2
+    return node(merkle_root(leaves[:k]), merkle_root(leaves[k:]))
+
+leaves   = [leaf(bytes.fromhex(c[f].removeprefix("sha256:"))) for f in sorted(c)]
+computed = merkle_root(leaves).hex()
+expected = proof["hashes"]["chain"].removeprefix("sha256:")
+print("VERIFIED" if computed == expected else "TAMPERED")
+```
+
+Recomputing the chain hash proves self-consistency only — whoever fabricates a proof
+produces coherent hashes. The evidence is the RFC 3161 timestamp and the Sigstore Rekor
+entry on the anchored hash (the batch root when `batch_anchor.status` is `"anchored"`,
+the chain hash itself otherwise).
+
+### Values algorithm (spec_version "1.2" / "2.1")
 
 ```python
 import json, hashlib
