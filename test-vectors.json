@@ -3,7 +3,7 @@
   "algorithm": "SHA-256",
   "canonical_json_rule": "json.dumps(data, sort_keys=True, separators=(\",\", \":\"))",
   "chain_formula_current": "MerkleRoot_RFC6962({ SHA256(field || 0x00 || nonce || canonical_json(value)) for each chain field }, leaves ordered by field name)",
-  "note": "Vectors 1-7 use the LEGACY string-concatenation algorithm (spec_version 1.1/2.0). Vectors 8-9 hash the canonical JSON of the values themselves (spec_version 1.2/2.1). Vectors 10-11 are spec_version 3.0: the chain hash is the RFC 6962 Merkle root of one commitment per field, so it is recomputable from the published commitments alone, with no field value. Their nonces are fixed here to make the vector reproducible; a real proof draws 32 fresh random bytes per field and per proof. Vector 12 covers batch anchoring: the Merkle root over several chain hashes, and one inclusion path per leaf. transaction_id = payment.transaction_id from the proof JSON. buyer_fingerprint = SHA256(api_key). In test vector inputs, the field is named payment_intent_id for historical reasons. Vectors 13-14 are spec_version 3.1: the identity triple (agent_identity, agent_identity_verified, did_resolution_status) joins the committed chain fields, always present, a missing identity committed as null. Their nonces are PUBLISHED in the proof (expected.published_nonces), so any third party opens the triple and checks the served values against the anchored commitments. Hiding is given up on these three fields and on no other.",
+  "note": "Vectors 1-7 use the LEGACY string-concatenation algorithm (spec_version 1.1/2.0). Vectors 8-9 hash the canonical JSON of the values themselves (spec_version 1.2/2.1). Vectors 10-11 are spec_version 3.0: the chain hash is the RFC 6962 Merkle root of one commitment per field, so it is recomputable from the published commitments alone, with no field value. Their nonces are fixed here to make the vector reproducible; a real proof draws 32 fresh random bytes per field and per proof. Vector 12 covers batch anchoring: the Merkle root over several chain hashes, and one inclusion path per leaf. transaction_id = payment.transaction_id from the proof JSON. buyer_fingerprint = SHA256(api_key). In test vector inputs, the field is named payment_intent_id for historical reasons. Vectors 13-14 are spec_version 3.1: the identity block (agent_identity, agent_identity_verified, did_resolution_status, identity_consistent) joins the committed chain fields, always present, a missing identity committed as null. Their nonces are PUBLISHED in the proof (expected.published_nonces), so any third party opens the block and checks the served values against the anchored commitments. Hiding is given up on these four fields and on no other.",
   "vectors": [
     {
       "name": "minimal_transaction",
@@ -426,11 +426,13 @@
           "seller": "1643109668481c4e6b12bde2df3ae3107d2d93a87885a6d61683cb076fa77eff",
           "agent_identity": "79a3fae23bf4238a6dc32ae16519d116b9907180e3cb4be4e8fe58a8f60ad9ce",
           "agent_identity_verified": "b81232e2417ccd9cf0f83a6280e217a7349f48ca27bd40b7501eb4ff5d37edeb",
-          "did_resolution_status": "60603c8278c4e9cbd8ee572cc63b06f2a4bc05ad3d499bba8f3e50336006f679"
+          "did_resolution_status": "60603c8278c4e9cbd8ee572cc63b06f2a4bc05ad3d499bba8f3e50336006f679",
+          "identity_consistent": "f9f0fb076da4747ea93468238a198c7852b77c28fd9c3b52ff995d2e6f0012e0"
         },
         "agent_identity": "did:web:agent.example",
         "agent_identity_verified": true,
-        "did_resolution_status": "bound"
+        "did_resolution_status": "bound",
+        "identity_consistent": true
       },
       "expected": {
         "canonical_request": "{\"entity_id\":\"ENT-4417\"}",
@@ -447,7 +449,8 @@
           "seller": "corpus.arkforge.tech",
           "agent_identity": "did:web:agent.example",
           "agent_identity_verified": true,
-          "did_resolution_status": "bound"
+          "did_resolution_status": "bound",
+          "identity_consistent": true
         },
         "commitments": {
           "request_hash": "17a415c6a9d6bdf43de2fce2104f3842cfc7e62b8c6c6805f06802c98ba8b53d",
@@ -458,14 +461,16 @@
           "seller": "fcc01302923ae4e817cac3ef737341ac38b409a0c0acc06a42bd3f762db113ec",
           "agent_identity": "fabd3b1cc57da13c360493ff2f44ddea591a932f7c9cffcdbd97dd3d870b1156",
           "agent_identity_verified": "a0d6e97dc76db97330e5b24390503a046c2e0e44604bde8f5ffb4507c622ae68",
-          "did_resolution_status": "ee9efb684069ad0172ea95a52b65df6c7cecd9ad9246a3d779ba2122f8c432d5"
+          "did_resolution_status": "ee9efb684069ad0172ea95a52b65df6c7cecd9ad9246a3d779ba2122f8c432d5",
+          "identity_consistent": "e46d6d3bbce8a3e6c556ec05f834ebe6321a407dae1ab8826f5fce21aee6f543"
         },
         "published_nonces": {
           "agent_identity": "79a3fae23bf4238a6dc32ae16519d116b9907180e3cb4be4e8fe58a8f60ad9ce",
           "agent_identity_verified": "b81232e2417ccd9cf0f83a6280e217a7349f48ca27bd40b7501eb4ff5d37edeb",
-          "did_resolution_status": "60603c8278c4e9cbd8ee572cc63b06f2a4bc05ad3d499bba8f3e50336006f679"
+          "did_resolution_status": "60603c8278c4e9cbd8ee572cc63b06f2a4bc05ad3d499bba8f3e50336006f679",
+          "identity_consistent": "f9f0fb076da4747ea93468238a198c7852b77c28fd9c3b52ff995d2e6f0012e0"
         },
-        "chain_hash": "7087e7b61c27a3fe9e7b5d433d738e3e46c9c50f63e073602e01d81531e454a2"
+        "chain_hash": "8719752410e476e2b90d2ddc0de9acb169737487478b1f1728c9d1efbf20ea89"
       }
     },
     {
@@ -492,11 +497,13 @@
           "seller": "c3954fab2b99aa04f8b6e1fa1ca5ab3e6760dd5eacb0443394e312885a1cf740",
           "agent_identity": "9dfb59b283434e3a865efbeeb976a367ef4d3f91677d29d701f9118db2abc4a7",
           "agent_identity_verified": "8900d3193539b78eaea5c9f53d0a99c8a968a5bba20c217a0fb64bdddde8921a",
-          "did_resolution_status": "a7a6b9dbe52c9f8aabfbba1ce952245580095bc0507b0d8ee1c12f8a83b52c86"
+          "did_resolution_status": "a7a6b9dbe52c9f8aabfbba1ce952245580095bc0507b0d8ee1c12f8a83b52c86",
+          "identity_consistent": "e37ee1c1528e87d4f2c8f51cfaf143f464704de42a9e0d1055830e67b8001c5a"
         },
         "agent_identity": null,
         "agent_identity_verified": null,
-        "did_resolution_status": null
+        "did_resolution_status": null,
+        "identity_consistent": null
       },
       "expected": {
         "canonical_request": "{\"entity_id\":\"ENT-0001\"}",
@@ -513,7 +520,8 @@
           "seller": "corpus.arkforge.tech",
           "agent_identity": null,
           "agent_identity_verified": null,
-          "did_resolution_status": null
+          "did_resolution_status": null,
+          "identity_consistent": null
         },
         "commitments": {
           "request_hash": "6cd495cec9f2a57cffd5bf78983acae82c49f568419baa67944083acabfe9705",
@@ -524,14 +532,16 @@
           "seller": "7b88ea1af5463ecd3b3344ee6839ab8f881558c7e127794877c722301f39c925",
           "agent_identity": "169be79df1432c6fdefc343c91a718ab0ec4088807ad3982e5cf6d6ade2e7f97",
           "agent_identity_verified": "98348aaa6790cd123fbbd0b31701f255746ac5d86f7b8392d76a8be8632a128e",
-          "did_resolution_status": "d0c4647f3108bd52d7ca369963834f79a7277c7ecde956297203df7432fd1d38"
+          "did_resolution_status": "d0c4647f3108bd52d7ca369963834f79a7277c7ecde956297203df7432fd1d38",
+          "identity_consistent": "6b7f4afb645968d68e0662f1a112b5fa3d30708ff60e4f1c5f905512ed99497e"
         },
         "published_nonces": {
           "agent_identity": "9dfb59b283434e3a865efbeeb976a367ef4d3f91677d29d701f9118db2abc4a7",
           "agent_identity_verified": "8900d3193539b78eaea5c9f53d0a99c8a968a5bba20c217a0fb64bdddde8921a",
-          "did_resolution_status": "a7a6b9dbe52c9f8aabfbba1ce952245580095bc0507b0d8ee1c12f8a83b52c86"
+          "did_resolution_status": "a7a6b9dbe52c9f8aabfbba1ce952245580095bc0507b0d8ee1c12f8a83b52c86",
+          "identity_consistent": "e37ee1c1528e87d4f2c8f51cfaf143f464704de42a9e0d1055830e67b8001c5a"
         },
-        "chain_hash": "4a4b11b5647ee01ef749fbecde897772d97d3bd8cd9adb900e20ad4367cfa8b8"
+        "chain_hash": "a3c27f3e10af92d191fdf0da65efdf297e6d3a94efeffa5b949a2e3d4e99a73d"
       }
     }
   ],

@@ -71,7 +71,8 @@ def inclusion_root(leaf: bytes, index: int, size: int, path):
     return h, i
 
 
-IDENTITY_FIELDS = ("agent_identity", "agent_identity_verified", "did_resolution_status")
+IDENTITY_FIELDS = ("agent_identity", "agent_identity_verified", "did_resolution_status",
+                   "identity_consistent")
 
 
 def commitments_root(commitments: dict) -> str:
