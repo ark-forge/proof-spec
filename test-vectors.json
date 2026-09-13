@@ -1,10 +1,9 @@
 {
-  "spec_version": "2.1.3",
+  "spec_version": "3.0.0",
   "algorithm": "SHA-256",
   "canonical_json_rule": "json.dumps(data, sort_keys=True, separators=(\",\", \":\"))",
-  "chain_formula_current": "SHA256(canonical_json({buyer_fingerprint, request_hash, response_hash, seller, timestamp, transaction_id [, upstream_timestamp] [, receipt_content_hash]}))",
-  "chain_formula_legacy": "SHA256(request_hash + response_hash + transaction_id + timestamp + buyer_fingerprint + seller [+ upstream_timestamp] [+ receipt_content_hash])",
-  "note": "Vectors 1-7 use the LEGACY string-concatenation algorithm (spec_version 1.1/2.0). Vectors 8-9 use the CURRENT canonical-JSON algorithm (spec_version 1.2/2.1). transaction_id = payment.transaction_id from the proof JSON. buyer_fingerprint = SHA256(api_key). In test vector inputs, the field is named payment_intent_id for historical reasons.",
+  "chain_formula_current": "MerkleRoot_RFC6962({ SHA256(field || 0x00 || nonce || canonical_json(value)) for each chain field }, leaves ordered by field name)",
+  "note": "Vectors 1-7 use the LEGACY string-concatenation algorithm (spec_version 1.1/2.0). Vectors 8-9 hash the canonical JSON of the values themselves (spec_version 1.2/2.1). Vectors 10-11 are spec_version 3.0: the chain hash is the RFC 6962 Merkle root of one commitment per field, so it is recomputable from the published commitments alone, with no field value. Their nonces are fixed here to make the vector reproducible; a real proof draws 32 fresh random bytes per field and per proof. Vector 12 covers batch anchoring: the Merkle root over several chain hashes, and one inclusion path per leaf. transaction_id = payment.transaction_id from the proof JSON. buyer_fingerprint = SHA256(api_key). In test vector inputs, the field is named payment_intent_id for historical reasons.",
   "vectors": [
     {
       "name": "minimal_transaction",
@@ -245,6 +244,164 @@
         "canonical_chain_data": "{\"buyer_fingerprint\":\"7c8f263e06d5ce4681f750ad64ede882a4ebd87de60f9ae0e6b06f0300645a11\",\"receipt_content_hash\":\"af65b75f3901dfd0ed9590a009bf7283e318801e15733bf68403219967d4edb7\",\"request_hash\":\"0987aa49eb45583406b66c77ea6f35498bd318b81040bec9c54ab439114abe42\",\"response_hash\":\"bad7c7f7f632182e9d746c9a4a02aea5f526a6a76c5108c4a98a7c4823fdbef2\",\"seller\":\"arkforge.fr\",\"timestamp\":\"2026-01-15T12:00:00Z\",\"transaction_id\":\"pi_test_abc123\",\"upstream_timestamp\":\"Wed, 15 Jan 2026 12:00:01 GMT\"}",
         "chain_hash": "0ad9bb1baae5431ce793195bc6e89f8acd25d6de99a721abd44ed58989efaa4d"
       }
+    },
+    {
+      "name": "commitments_minimal",
+      "input": {
+        "request": {
+          "repo_url": "https://github.com/example/app"
+        },
+        "response": {
+          "files_scanned": 42,
+          "frameworks": [
+            "openai"
+          ]
+        },
+        "payment_intent_id": "pi_test_abc123",
+        "timestamp": "2026-01-15T12:00:00Z",
+        "api_key": "mcp_test_example_key",
+        "seller": "arkforge.fr",
+        "nonces": {
+          "buyer_fingerprint": "957c0534699e32745769701969dbb1817ff0f799e5758ce6388b68d0ec8ae143",
+          "request_hash": "a11cfe76ceeba936f9188e40f84bf8f05b1e210239ff02a098f2e0b816007afb",
+          "response_hash": "99a1b895042b7b3a9b033275e57fdf645eae388ab0a267e0d7def2b6794b215b",
+          "seller": "6214efdff66beb53dc768c5b5c4c464ecd79727b4cbd738b016d122ffa97ce22",
+          "timestamp": "8ae28267bebdc268e78ac2b61902c58da2ac3d0e4588f597d271a05ce5e8e025",
+          "transaction_id": "e2b782653f02d6802d29c2da285a3b7335d292100d5c4c32d9a61750076cbf26"
+        }
+      },
+      "expected": {
+        "canonical_request": "{\"repo_url\":\"https://github.com/example/app\"}",
+        "canonical_response": "{\"files_scanned\":42,\"frameworks\":[\"openai\"]}",
+        "request_hash": "0987aa49eb45583406b66c77ea6f35498bd318b81040bec9c54ab439114abe42",
+        "response_hash": "bad7c7f7f632182e9d746c9a4a02aea5f526a6a76c5108c4a98a7c4823fdbef2",
+        "buyer_fingerprint": "7c8f263e06d5ce4681f750ad64ede882a4ebd87de60f9ae0e6b06f0300645a11",
+        "chain_data": {
+          "request_hash": "0987aa49eb45583406b66c77ea6f35498bd318b81040bec9c54ab439114abe42",
+          "response_hash": "bad7c7f7f632182e9d746c9a4a02aea5f526a6a76c5108c4a98a7c4823fdbef2",
+          "transaction_id": "pi_test_abc123",
+          "timestamp": "2026-01-15T12:00:00Z",
+          "buyer_fingerprint": "7c8f263e06d5ce4681f750ad64ede882a4ebd87de60f9ae0e6b06f0300645a11",
+          "seller": "arkforge.fr"
+        },
+        "commitments": {
+          "request_hash": "687e2a14776ec07976443c56751695449ba534ab52c269760db5f8b1340304e9",
+          "response_hash": "c718512b4cccfee053edf9029b85b500682fde09f2686c8ae13532d5f18e1d0c",
+          "transaction_id": "f224d10886a95796938b5f2038db26cf2ac834607cd0f44e62ac375c4b778263",
+          "timestamp": "e3e6a05e8bddbdf71d8e3cde54b598414d6d5552b2782a14f3e7d8831ba6f7cb",
+          "buyer_fingerprint": "cc06c13453ff06be01156f45d045156501f918561bea9a133c4eb7a0c5a4708a",
+          "seller": "eb98fa4a815e0c51f702a450e9b2f53d30475136c3d58d8b9994ced6420c6202"
+        },
+        "chain_hash": "dc2f9b7f8c9b455cd5c2068bac5b210a9f921b46f59569d57b28abcdfd70b8f2"
+      },
+      "spec_version": "3.0",
+      "algorithm": "commitments"
+    },
+    {
+      "name": "commitments_upstream_and_receipt",
+      "input": {
+        "request": {
+          "q": "état des lieux"
+        },
+        "response": {
+          "ok": true
+        },
+        "payment_intent_id": "pi_test_xyz789",
+        "timestamp": "2026-03-02T08:30:00Z",
+        "api_key": "mcp_test_example_key",
+        "seller": "api.example.com",
+        "upstream_timestamp": "Mon, 02 Mar 2026 08:30:01 GMT",
+        "receipt_content_hash": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "nonces": {
+          "buyer_fingerprint": "5ae157e9afe790b71ea0352b1b50106200a8dd97c033772cca6e1756a139e46c",
+          "receipt_content_hash": "5d1780afe127884675d8df559fb8abf4ffd18939427ea3c12c2822fbba5a4d02",
+          "request_hash": "8219bef40bc037c01a2ac6c40c1460395dafa6e64df5923917b46f8c5cebe630",
+          "response_hash": "a852b87370cb7a50e5df52dea791257ea6fd5de0a3a2dbacd3e1f1558ceac79a",
+          "seller": "c55cfbadd08e2cdae9336ca35d5933bd8eaa5c080784a5f65bfb37976206aa67",
+          "timestamp": "84a93b0cb837649e2431dd83972634922db34603e4b4514743dce0facd2a548b",
+          "transaction_id": "f589f4afab07110d46de3a7bd9b72c74e0388361a3f80adc3d54562e31cb6d6e",
+          "upstream_timestamp": "a74f6ff38d26356470c782a28f572671ccdd828adb400be0c978c9faa4523125"
+        }
+      },
+      "expected": {
+        "canonical_request": "{\"q\":\"\\u00e9tat des lieux\"}",
+        "canonical_response": "{\"ok\":true}",
+        "request_hash": "060a6a36ad45a0a1cca5f921d10b1829a98b557319062771d250cbf1b6b96e2a",
+        "response_hash": "4062edaf750fb8074e7e83e0c9028c94e32468a8b6f1614774328ef045150f93",
+        "buyer_fingerprint": "7c8f263e06d5ce4681f750ad64ede882a4ebd87de60f9ae0e6b06f0300645a11",
+        "chain_data": {
+          "request_hash": "060a6a36ad45a0a1cca5f921d10b1829a98b557319062771d250cbf1b6b96e2a",
+          "response_hash": "4062edaf750fb8074e7e83e0c9028c94e32468a8b6f1614774328ef045150f93",
+          "transaction_id": "pi_test_xyz789",
+          "timestamp": "2026-03-02T08:30:00Z",
+          "buyer_fingerprint": "7c8f263e06d5ce4681f750ad64ede882a4ebd87de60f9ae0e6b06f0300645a11",
+          "seller": "api.example.com",
+          "upstream_timestamp": "Mon, 02 Mar 2026 08:30:01 GMT",
+          "receipt_content_hash": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        },
+        "commitments": {
+          "request_hash": "bbc116eacb1a0786debe941ac20800b29aa37007c54ffb28a6c373982c04470b",
+          "response_hash": "8426f602bf93e2b9cb9dd580f6f97173f3fb116e56f123600e31cdbfd433a2f3",
+          "transaction_id": "de9664bacee2dc239e5f0361229be2c1d04d818c52b7a67df6af1063ff55d038",
+          "timestamp": "3cb13ee4f74b943eb05483b30f8039dfbb63918521c4fed201e13e0a88d75e35",
+          "buyer_fingerprint": "01071a01a568269a389224755886d2f41f17269c4e859c27536d6a0f0e309357",
+          "seller": "e3600754d413dfb31999462773a5dbb5ea25cdb3e643a939b840e7c1a0946a36",
+          "upstream_timestamp": "472a18f26a7ddd4e82e129a2bc4839293da528c03d91ba9ded7829b491fd6425",
+          "receipt_content_hash": "054d8cf1bb7e92dcea3903b94da05ec0a7e38daab142a2c31e570d7f45f4e50c"
+        },
+        "chain_hash": "2c6e0bc4b4f3f8547ba289bb1a8f04ddd3ea91d077dd8aa997b38d5e4f2ff07c"
+      },
+      "spec_version": "3.0",
+      "algorithm": "commitments"
+    },
+    {
+      "name": "batch_anchor_inclusion",
+      "input": {
+        "chain_hashes": [
+          "dc2f9b7f8c9b455cd5c2068bac5b210a9f921b46f59569d57b28abcdfd70b8f2",
+          "2c6e0bc4b4f3f8547ba289bb1a8f04ddd3ea91d077dd8aa997b38d5e4f2ff07c",
+          "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+          "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+        ]
+      },
+      "expected": {
+        "tree_size": 4,
+        "root": "b627978e58b7414ca3972bbc8c3a80c77899165bfcd876ac4eccefb7f59bd974",
+        "inclusion": [
+          {
+            "leaf_index": 0,
+            "audit_path": [
+              "00cb7c8c41b3733d6b4d741d0d0e21bc289001d7a76d8a101b74d594d8d9f112",
+              "03938e2c8f758e6cae443d499b41c899c373eb0c0198bae61796a069f2b05904"
+            ]
+          },
+          {
+            "leaf_index": 1,
+            "audit_path": [
+              "09285ee14f6c28a1d621f5c8942b85b2daec7c676fb9b63ab3a54023f6de00e3",
+              "03938e2c8f758e6cae443d499b41c899c373eb0c0198bae61796a069f2b05904"
+            ]
+          },
+          {
+            "leaf_index": 2,
+            "audit_path": [
+              "4f16119d36ccd0da91102f57692d73934fd0ad2494280df88449accedbbfb7ea",
+              "3e7faf3d801ba6b915cb5a4c26171a3f397a0b8d707904135e0618357ff5100f"
+            ]
+          },
+          {
+            "leaf_index": 3,
+            "audit_path": [
+              "e0bb82791bae3c50bd9c20fa4ccdcb8064a56e5c12bc69b07e6712ac9b4429e6",
+              "3e7faf3d801ba6b915cb5a4c26171a3f397a0b8d707904135e0618357ff5100f"
+            ]
+          }
+        ]
+      },
+      "spec_version": "3.0",
+      "algorithm": "batch_merkle"
     }
-  ]
+  ],
+  "chain_formula_values": "SHA256(canonical_json({buyer_fingerprint, request_hash, response_hash, seller, timestamp, transaction_id [, upstream_timestamp] [, receipt_content_hash]})) — spec_version 1.2 / 2.1",
+  "chain_formula_legacy": "SHA256(request_hash + response_hash + transaction_id + timestamp + buyer_fingerprint + seller [+ upstream_timestamp] [+ receipt_content_hash])"
 }

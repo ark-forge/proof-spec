@@ -27,6 +27,56 @@ def sha256(s: str) -> str:
     return hashlib.sha256(s.encode("utf-8")).hexdigest()
 
 
+# --- spec 3.0 primitives: per-field commitments and RFC 6962 Merkle ----------
+
+def commit(field: str, nonce_hex: str, value) -> str:
+    """sha256(field || 0x00 || nonce || canonical_json(value))."""
+    preimage = (field.encode("utf-8") + b"\x00" + bytes.fromhex(nonce_hex)
+                + canonical_json(value).encode("utf-8"))
+    return hashlib.sha256(preimage).hexdigest()
+
+
+def leaf_hash(data: bytes) -> bytes:
+    return hashlib.sha256(b"\x00" + data).digest()
+
+
+def node_hash(left: bytes, right: bytes) -> bytes:
+    return hashlib.sha256(b"\x01" + left + right).digest()
+
+
+def merkle_root(leaves):
+    """RFC 6962 Merkle Tree Hash. The odd node is promoted, never duplicated."""
+    if len(leaves) == 1:
+        return leaves[0]
+    k = 1
+    while k * 2 < len(leaves):
+        k *= 2
+    return node_hash(merkle_root(leaves[:k]), merkle_root(leaves[k:]))
+
+
+def inclusion_root(leaf: bytes, index: int, size: int, path):
+    """RFC 6962 inclusion-proof walk. Returns (root, siblings_consumed)."""
+    h, idx, sz, i = leaf, index, size, 0
+    while sz > 1:
+        if i >= len(path):
+            return h, i
+        if idx % 2 == 1:
+            h = node_hash(path[i], h)
+            i += 1
+        elif idx + 1 < sz:
+            h = node_hash(h, path[i])
+            i += 1
+        idx //= 2
+        sz = (sz + 1) // 2
+    return h, i
+
+
+def commitments_root(commitments: dict) -> str:
+    """Spec 3.0 chain hash: Merkle root over the commitments, fields sorted."""
+    return merkle_root([leaf_hash(bytes.fromhex(commitments[f]))
+                        for f in sorted(commitments)]).hex()
+
+
 def check_spec_version():
     """spec_version in test-vectors.json must appear in SPEC.md examples."""
     vectors = json.loads(VECTORS.read_text())
@@ -59,6 +109,30 @@ def check_test_vectors():
         name = v["name"]
         inp = v["input"]
         exp = v["expected"]
+
+        # Batch anchoring vector: no request/response, only chain hashes and a tree
+        if v.get("algorithm") == "batch_merkle":
+            leaves = [leaf_hash(bytes.fromhex(c)) for c in inp["chain_hashes"]]
+            root = merkle_root(leaves).hex()
+            if root != exp["root"]:
+                print(f"FAIL [{name}]: batch root mismatch")
+                print(f"  got:      {root}")
+                print(f"  expected: {exp['root']}")
+                ok = False
+                continue
+            bad = False
+            for item in exp["inclusion"]:
+                i = item["leaf_index"]
+                path = [bytes.fromhex(h) for h in item["audit_path"]]
+                walked, consumed = inclusion_root(leaves[i], i, exp["tree_size"], path)
+                if walked.hex() != exp["root"] or consumed != len(path):
+                    print(f"FAIL [{name}]: inclusion proof for leaf {i} does not reach the root")
+                    bad = True
+            if bad:
+                ok = False
+            else:
+                print(f"OK [{name}]: batch root and {len(exp['inclusion'])} inclusion proofs verified")
+            continue
 
         # Canonical JSON
         canon_req = canonical_json(inp["request"])
@@ -94,7 +168,34 @@ def check_test_vectors():
 
         # Chain hash — algorithm depends on vector's spec_version
         algo = v.get("algorithm", "concatenation")
-        if algo == "canonical_json":
+        if algo == "commitments":
+            chain_data = {
+                "request_hash": req_hash,
+                "response_hash": resp_hash,
+                "transaction_id": inp["payment_intent_id"],
+                "timestamp": inp["timestamp"],
+                "buyer_fingerprint": buyer_fp,
+                "seller": inp["seller"],
+            }
+            if inp.get("upstream_timestamp"):
+                chain_data["upstream_timestamp"] = inp["upstream_timestamp"]
+            if inp.get("receipt_content_hash"):
+                chain_data["receipt_content_hash"] = inp["receipt_content_hash"]
+            if chain_data != exp["chain_data"]:
+                print(f"FAIL [{name}]: chain_data mismatch")
+                ok = False
+                continue
+            commitments = {f: commit(f, inp["nonces"][f], chain_data[f]) for f in chain_data}
+            if commitments != exp["commitments"]:
+                for f in commitments:
+                    if commitments[f] != exp["commitments"].get(f):
+                        print(f"FAIL [{name}]: commitment for '{f}' mismatch")
+                        print(f"  got:      {commitments[f]}")
+                        print(f"  expected: {exp['commitments'].get(f)}")
+                ok = False
+                continue
+            chain_hash = commitments_root(commitments)
+        elif algo == "canonical_json":
             chain_data = {
                 "buyer_fingerprint": buyer_fp,
                 "request_hash": req_hash,
