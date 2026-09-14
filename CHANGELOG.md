@@ -11,6 +11,24 @@ Versioning: [Semantic Versioning](https://semver.org/spec/v2.0.0.html)
 
 ---
 
+## [3.1.1] — 2026-09-14
+
+Wording only. No change to the proof format, the algorithms or the test vectors.
+
+### Fixed
+- The 3.1.0 text said hiding was given up on the identity block's four fields "and on
+  no other". That overstated it: a public response serves `hashes.request`,
+  `hashes.response`, `timestamp`, `parties.seller`, `upstream_timestamp` and
+  `provider_payment.receipt_content_hash` in clear, with their nonces kept secret. Those
+  values are neither hidden nor tied to the anchored root for a third party: altering one
+  in a public response leaves every public check passing. The section now says so, and
+  requires a verifier that relies on one of them to open its commitment with the pair
+  obtained from the owner.
+- "What the signature covers" now states that covered means tamper-evident for the
+  attestor, not checkable by a third party from the public response.
+
+---
+
 ## [3.1.0] — 2026-09-13
 
 ### Added
