@@ -1,4 +1,4 @@
-# ArkForge Proof Specification v3.1.0
+# ArkForge Proof Specification v3.1.1
 
 An open standard for verifiable agent-to-agent execution proofs.
 
@@ -285,10 +285,24 @@ assert commit(field, bytes.fromhex(item["nonce"]), item["value"]).hex() \
        == proof["commitments"][field]
 ```
 
-Hiding is given up on these four fields and on **no other**: every remaining nonce
-stays secret. A verifier MUST treat the flat `agent_identity*` fields of a public
+These four are the only nonces published: every other nonce stays with the proof's
+owner. A verifier MUST treat the flat `agent_identity*` fields of a public
 response as informational and take the value from `disclosed`; an attestor MUST serve
 the same value in both.
+
+**A secret nonce does not make a served value hidden, nor bound.** A public response
+(§9) also serves `hashes.request`, `hashes.response`, `timestamp`, `parties.seller`,
+`upstream_timestamp` and `provider_payment.receipt_content_hash` in clear. Their
+nonces are not published, so:
+
+- those values are **not hidden**: anyone reads them;
+- a third party **cannot tie them to the anchored root**: recomputing the root uses
+  the commitments only, and nothing links the flat value to its commitment. Altering
+  one of these fields in a public response leaves every public check passing.
+
+A verifier that relies on one of them MUST open its commitment with the
+`(nonce, value)` pair obtained from the proof's owner (the authenticated response
+carries every nonce), and MUST NOT treat the flat value alone as evidence.
 
 **What this establishes, and what it does not.** It makes the identity claim
 non-repudiable: the attestor committed to it before anchoring and cannot restate it.
@@ -650,6 +664,8 @@ pub.verify(b64url_decode(sig_b64), chain_hash.encode("utf-8"))
 ### What the signature covers vs. does not cover
 
 **Covered** (via the chain hash): `hashes.request`, `hashes.response`, `payment.transaction_id`, `timestamp`, `parties.buyer_fingerprint`, `parties.seller`, `upstream_timestamp` (if present), `provider_payment.receipt_content_hash` (if present).
+
+Covered means the attestor cannot change these values after signing without breaking the signature. It does not mean a third party can check the values it is shown: for `spec_version` `"3.0"` and above, the chain hash is a Merkle root over commitments, and a flat value is tied to its commitment only by a nonce the public response does not carry (§2, *Public opening of the identity block*). For earlier versions, a public response filtered as §9 recommends lacks `parties.buyer_fingerprint` and the payment transaction id, so the chain hash cannot be recomputed from it either.
 
 **Not covered** (mutable metadata): `identity_consistent`, `timestamp_authority` status, `transaction_success`, `upstream_status_code`, `disputed`, `dispute_id`. These fields are informational and may change after proof creation.
 
