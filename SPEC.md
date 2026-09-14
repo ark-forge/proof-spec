@@ -1,4 +1,4 @@
-# ArkForge Proof Specification v3.0.0
+# ArkForge Proof Specification v3.1.0
 
 An open standard for verifiable agent-to-agent execution proofs.
 
@@ -86,7 +86,7 @@ A conformant proof is a JSON object. The following fields are **required**:
 ```json
 {
   "proof_id": "prf_20260225_170950_fdec72",
-  "spec_version": "3.0",
+  "spec_version": "3.1",
   "timestamp": "2026-02-25T17:09:47Z",
   "hashes": {
     "request": "sha256:<hex>",
@@ -171,7 +171,7 @@ All variants produce a valid chain hash. The `payment.transaction_id` value is u
 
 The chain hash binds every element of a transaction into a single verifiable seal.
 
-### Algorithm (spec_version "3.0" — current)
+### Algorithm (spec_version "3.1" — current)
 
 Each chain field is committed to separately, and the chain hash is the RFC 6962 Merkle
 root of those commitments:
@@ -205,13 +205,31 @@ hash is recomputable from public data, and nothing that was private becomes publ
 
 ### Fields committed
 
-The committed set is unchanged from spec 2.1:
-
 ```
 request_hash, response_hash, transaction_id, timestamp, buyer_fingerprint, seller
+agent_identity, agent_identity_verified, did_resolution_status,
+identity_consistent                                              (spec 3.1, ALWAYS)
 [+ upstream_timestamp]      when present and non-null
 [+ receipt_content_hash]    when present, stripped of its "sha256:" prefix
 ```
+
+**Spec 3.1 added the identity block.** `identity_consistent` belongs to it: it is a
+judgment ON the identity, so committing its three neighbours and leaving it out would
+rebuild the same hole one field to the left. Up to 3.0 those four fields were served in
+public proof responses (section 9) but committed nowhere: outside the Merkle root,
+therefore outside `hashes.chain`, the Ed25519 signature, the RFC 3161 token and the
+Rekor entry. An attestor could restate an agent's identity after anchoring and every
+external witness still verified. Any ranking or audit that reads
+`agent_identity_verified` was, up to 3.0, reading the attestor's unbacked word.
+
+The block is committed **unconditionally**, unlike `upstream_timestamp` and
+`receipt_content_hash`. An absent identity is committed as `null`. Committing it only
+when present would let an attestor omit the fields and leave a verifier with no
+commitment to check against.
+
+`agent_identity_verified` is `true` or `null`, never `false`: a single normalisation
+at the source, so the value committed and the value served cannot disagree.
+`agent_version` is NOT committed — it carries no verifiable claim.
 
 #### Reference implementation (Python)
 
@@ -244,6 +262,43 @@ chain_hash  = merkle_root([leaf(bytes.fromhex(commitments[f]))
                            for f in sorted(commitments)]).hex()
 ```
 
+### Public opening of the identity block (spec 3.1)
+
+A commitment hides its value: a third party recomputes the root from the published
+digests and never learns a field. For the identity block that is not enough, because
+the values must be **readable** by whoever reads the proof. So spec 3.1 publishes those
+four nonces in the proof itself, under `disclosed`:
+
+```json
+"disclosed": {
+  "agent_identity":          {"nonce": "<64 hex>", "value": "did:web:agent.example"},
+  "agent_identity_verified": {"nonce": "<64 hex>", "value": true},
+  "did_resolution_status":   {"nonce": "<64 hex>", "value": "bound"},
+  "identity_consistent":     {"nonce": "<64 hex>", "value": true}
+}
+```
+
+Any party checks each triplet against the commitment the anchors cover:
+
+```python
+assert commit(field, bytes.fromhex(item["nonce"]), item["value"]).hex() \
+       == proof["commitments"][field]
+```
+
+Hiding is given up on these four fields and on **no other**: every remaining nonce
+stays secret. A verifier MUST treat the flat `agent_identity*` fields of a public
+response as informational and take the value from `disclosed`; an attestor MUST serve
+the same value in both.
+
+**What this establishes, and what it does not.** It makes the identity claim
+non-repudiable: the attestor committed to it before anchoring and cannot restate it.
+It does **not** let a third party verify the binding itself — no public artefact proves
+the Ed25519 challenge-response happened. A verifier that needs more MUST resolve the
+DID itself.
+
+A `spec_version` below `"3.1"` carries no anchored identity. A verifier MUST NOT treat
+its `agent_identity_verified` as evidence.
+
 ### Selective disclosure
 
 The proof owner holds the nonces. To prove one field to a counterparty without revealing
@@ -272,7 +327,12 @@ commitment is what makes the pair self-sufficient.
 | `seller` | `parties.seller` | Target domain (e.g. `arkforge.fr`) |
 | `upstream_timestamp` | `upstream_timestamp` | Upstream service's HTTP `Date` header. **Committed only when present and non-null** |
 | `receipt_content_hash` | `provider_payment.receipt_content_hash` | SHA-256 hex of raw receipt bytes. **Committed only when present**. Strip the `sha256:` prefix |
+| `agent_identity` | `parties.agent_identity` | Declared or bound agent DID, or `null`. **Committed unconditionally (3.1)** |
+| `agent_identity_verified` | `parties.agent_identity_verified` | `true` when the DID is bound via Ed25519 challenge-response, else `null` — never `false`. **Committed unconditionally (3.1)** |
+| `did_resolution_status` | `parties.did_resolution_status` | `"bound"`, `"unverified"`, or `null`. **Committed unconditionally (3.1)** |
+| `identity_consistent` | `identity_consistent` | `true`/`false`/`null` — whether the declared identity agrees with what the attestor already knows for this key. **Committed unconditionally (3.1)** |
 | `commitments` | `commitments` | One hex commitment per committed field, published in full |
+| `disclosed` | `disclosed` | The identity block's `(nonce, value)` pairs, published for everyone (3.1) |
 
 ### Backward compatibility
 
@@ -281,7 +341,8 @@ or re-anchored retroactively.
 
 | `spec_version` | Chain hash |
 |---|---|
-| `"3.0"` | Merkle root of per-field commitments (current) |
+| `"3.1"` | Merkle root of per-field commitments, identity block included and publicly opened (current) |
+| `"3.0"` | Merkle root of per-field commitments; identity served but **not** committed |
 | `"1.2"`, `"2.1"` | `SHA256(canonical_json(chain_data))` over the **values** |
 | `"1.1"`, `"2.0"`, absent | `SHA256` of the values concatenated as raw UTF-8, no separator (legacy) |
 
@@ -653,6 +714,7 @@ When a proof is returned via an **unauthenticated** endpoint:
 
 - `parties.buyer_fingerprint` SHOULD be omitted (privacy)
 - `parties.agent_identity`, `parties.agent_identity_verified`, `parties.did_resolution_status`, and `parties.seller` SHOULD be included (third-party auditability)
+- For `spec_version` `"3.1"`, `disclosed` MUST be included: it carries the identity block's nonces, without which the anchored identity cannot be opened and the flat fields above are unbacked
 - `certification_fee` amounts and receipt URLs SHOULD be omitted
 - `buyer_reputation_score` and `buyer_profile_url` SHOULD be omitted
 - `provider_payment`: only `type`, `receipt_content_hash`, and `verification_status` SHOULD be retained; `receipt_url` and `parsed_fields` SHOULD be omitted

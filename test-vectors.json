@@ -1,9 +1,9 @@
 {
-  "spec_version": "3.0.0",
+  "spec_version": "3.1.0",
   "algorithm": "SHA-256",
   "canonical_json_rule": "json.dumps(data, sort_keys=True, separators=(\",\", \":\"))",
   "chain_formula_current": "MerkleRoot_RFC6962({ SHA256(field || 0x00 || nonce || canonical_json(value)) for each chain field }, leaves ordered by field name)",
-  "note": "Vectors 1-7 use the LEGACY string-concatenation algorithm (spec_version 1.1/2.0). Vectors 8-9 hash the canonical JSON of the values themselves (spec_version 1.2/2.1). Vectors 10-11 are spec_version 3.0: the chain hash is the RFC 6962 Merkle root of one commitment per field, so it is recomputable from the published commitments alone, with no field value. Their nonces are fixed here to make the vector reproducible; a real proof draws 32 fresh random bytes per field and per proof. Vector 12 covers batch anchoring: the Merkle root over several chain hashes, and one inclusion path per leaf. transaction_id = payment.transaction_id from the proof JSON. buyer_fingerprint = SHA256(api_key). In test vector inputs, the field is named payment_intent_id for historical reasons.",
+  "note": "Vectors 1-7 use the LEGACY string-concatenation algorithm (spec_version 1.1/2.0). Vectors 8-9 hash the canonical JSON of the values themselves (spec_version 1.2/2.1). Vectors 10-11 are spec_version 3.0: the chain hash is the RFC 6962 Merkle root of one commitment per field, so it is recomputable from the published commitments alone, with no field value. Their nonces are fixed here to make the vector reproducible; a real proof draws 32 fresh random bytes per field and per proof. Vector 12 covers batch anchoring: the Merkle root over several chain hashes, and one inclusion path per leaf. transaction_id = payment.transaction_id from the proof JSON. buyer_fingerprint = SHA256(api_key). In test vector inputs, the field is named payment_intent_id for historical reasons. Vectors 13-14 are spec_version 3.1: the identity block (agent_identity, agent_identity_verified, did_resolution_status, identity_consistent) joins the committed chain fields, always present, a missing identity committed as null. Their nonces are PUBLISHED in the proof (expected.published_nonces), so any third party opens the block and checks the served values against the anchored commitments. Hiding is given up on these four fields and on no other.",
   "vectors": [
     {
       "name": "minimal_transaction",
@@ -400,6 +400,149 @@
       },
       "spec_version": "3.0",
       "algorithm": "batch_merkle"
+    },
+    {
+      "name": "identity_verified_did",
+      "spec_version": "3.1",
+      "algorithm": "commitments",
+      "input": {
+        "request": {
+          "entity_id": "ENT-4417"
+        },
+        "response": {
+          "agrement": "valide",
+          "expire_le": "2027-03-31"
+        },
+        "payment_intent_id": "pi_test_identity",
+        "timestamp": "2026-09-13T12:00:00Z",
+        "api_key": "mcp_test_identity_key",
+        "seller": "corpus.arkforge.tech",
+        "nonces": {
+          "request_hash": "758c5cb2ecf9cdf65c0eed5ea1de25b660a2c437773bf996bcf0317197fd4fa3",
+          "response_hash": "a8acdf7386836cf3036832ffeae87986a32cd865d61094f519a6bdfd9210d89d",
+          "transaction_id": "99406926d17089505690a97d34e6a3ea60b3b7ea2c51791a980754336d9e3e5f",
+          "timestamp": "ab1ad88a5e60b59f965088710184a8ff785bdd84cd2fd16a75399f871adc1595",
+          "buyer_fingerprint": "99dffe375991133d011667c99e716daf27654dfef0ed2dc83fe00bbc253b8988",
+          "seller": "1643109668481c4e6b12bde2df3ae3107d2d93a87885a6d61683cb076fa77eff",
+          "agent_identity": "79a3fae23bf4238a6dc32ae16519d116b9907180e3cb4be4e8fe58a8f60ad9ce",
+          "agent_identity_verified": "b81232e2417ccd9cf0f83a6280e217a7349f48ca27bd40b7501eb4ff5d37edeb",
+          "did_resolution_status": "60603c8278c4e9cbd8ee572cc63b06f2a4bc05ad3d499bba8f3e50336006f679",
+          "identity_consistent": "f9f0fb076da4747ea93468238a198c7852b77c28fd9c3b52ff995d2e6f0012e0"
+        },
+        "agent_identity": "did:web:agent.example",
+        "agent_identity_verified": true,
+        "did_resolution_status": "bound",
+        "identity_consistent": true
+      },
+      "expected": {
+        "canonical_request": "{\"entity_id\":\"ENT-4417\"}",
+        "canonical_response": "{\"agrement\":\"valide\",\"expire_le\":\"2027-03-31\"}",
+        "request_hash": "6c63eb77ad577dc5288e8c110d4bee7c87b3f6857ac8fe653a1ad42d3198e2ed",
+        "response_hash": "9d9950bd02d24d12731b58452867e9dabc980c709f97ae64bf43cc1f58ee8d0a",
+        "buyer_fingerprint": "509a170b6b51db72a66eb0e157cb75c9b8ab2b384b07025bc137ce3e00909558",
+        "chain_data": {
+          "request_hash": "6c63eb77ad577dc5288e8c110d4bee7c87b3f6857ac8fe653a1ad42d3198e2ed",
+          "response_hash": "9d9950bd02d24d12731b58452867e9dabc980c709f97ae64bf43cc1f58ee8d0a",
+          "transaction_id": "pi_test_identity",
+          "timestamp": "2026-09-13T12:00:00Z",
+          "buyer_fingerprint": "509a170b6b51db72a66eb0e157cb75c9b8ab2b384b07025bc137ce3e00909558",
+          "seller": "corpus.arkforge.tech",
+          "agent_identity": "did:web:agent.example",
+          "agent_identity_verified": true,
+          "did_resolution_status": "bound",
+          "identity_consistent": true
+        },
+        "commitments": {
+          "request_hash": "17a415c6a9d6bdf43de2fce2104f3842cfc7e62b8c6c6805f06802c98ba8b53d",
+          "response_hash": "a016abb615b8cbe0333140a83201af3fcf5836f2f99dcc32e3664db3b069dbc9",
+          "transaction_id": "7a3bdfe611f3e2dc7e94b9c7c4b8fcd4386b2d6aa3936796caf2d49500025be9",
+          "timestamp": "f118d63b09d1be16f290450c9043b2df0170f49437721bd25f54fba76ea86a06",
+          "buyer_fingerprint": "cdc0c387a8592352d85e6395f40d6f7c49a9d9efdc5cca2183fdc69625a0afe7",
+          "seller": "fcc01302923ae4e817cac3ef737341ac38b409a0c0acc06a42bd3f762db113ec",
+          "agent_identity": "fabd3b1cc57da13c360493ff2f44ddea591a932f7c9cffcdbd97dd3d870b1156",
+          "agent_identity_verified": "a0d6e97dc76db97330e5b24390503a046c2e0e44604bde8f5ffb4507c622ae68",
+          "did_resolution_status": "ee9efb684069ad0172ea95a52b65df6c7cecd9ad9246a3d779ba2122f8c432d5",
+          "identity_consistent": "e46d6d3bbce8a3e6c556ec05f834ebe6321a407dae1ab8826f5fce21aee6f543"
+        },
+        "published_nonces": {
+          "agent_identity": "79a3fae23bf4238a6dc32ae16519d116b9907180e3cb4be4e8fe58a8f60ad9ce",
+          "agent_identity_verified": "b81232e2417ccd9cf0f83a6280e217a7349f48ca27bd40b7501eb4ff5d37edeb",
+          "did_resolution_status": "60603c8278c4e9cbd8ee572cc63b06f2a4bc05ad3d499bba8f3e50336006f679",
+          "identity_consistent": "f9f0fb076da4747ea93468238a198c7852b77c28fd9c3b52ff995d2e6f0012e0"
+        },
+        "chain_hash": "8719752410e476e2b90d2ddc0de9acb169737487478b1f1728c9d1efbf20ea89"
+      }
+    },
+    {
+      "name": "identity_absent_is_committed_as_null",
+      "spec_version": "3.1",
+      "algorithm": "commitments",
+      "input": {
+        "request": {
+          "entity_id": "ENT-0001"
+        },
+        "response": {
+          "agrement": "absent"
+        },
+        "payment_intent_id": "pi_test_no_identity",
+        "timestamp": "2026-09-13T12:00:00Z",
+        "api_key": "mcp_test_no_identity_key",
+        "seller": "corpus.arkforge.tech",
+        "nonces": {
+          "request_hash": "10af35b33ea9747a7671a9b2449b9dfbec7babec11b72f49b2f4ac919c20ca09",
+          "response_hash": "2524d68c965d7c630e7d9349c75bd178aa73932bce4a600d1d3124349a18907f",
+          "transaction_id": "543f54024cffb5fa1489bdbd12ab76d22033a5701f7604802387541ce3d7f6e0",
+          "timestamp": "92755b16aea345b1e8951d79c1395fb5e682ad57d819a1a1d47b08a7c2f5d72e",
+          "buyer_fingerprint": "1b65680b12aeeaa544517ef61951bcc6e3f1ee6aa4039d86faa958f32414323d",
+          "seller": "c3954fab2b99aa04f8b6e1fa1ca5ab3e6760dd5eacb0443394e312885a1cf740",
+          "agent_identity": "9dfb59b283434e3a865efbeeb976a367ef4d3f91677d29d701f9118db2abc4a7",
+          "agent_identity_verified": "8900d3193539b78eaea5c9f53d0a99c8a968a5bba20c217a0fb64bdddde8921a",
+          "did_resolution_status": "a7a6b9dbe52c9f8aabfbba1ce952245580095bc0507b0d8ee1c12f8a83b52c86",
+          "identity_consistent": "e37ee1c1528e87d4f2c8f51cfaf143f464704de42a9e0d1055830e67b8001c5a"
+        },
+        "agent_identity": null,
+        "agent_identity_verified": null,
+        "did_resolution_status": null,
+        "identity_consistent": null
+      },
+      "expected": {
+        "canonical_request": "{\"entity_id\":\"ENT-0001\"}",
+        "canonical_response": "{\"agrement\":\"absent\"}",
+        "request_hash": "08d9e6ab62cdacde40ee55db26aa331ca945bb2eba0225bcd47d88669bc63375",
+        "response_hash": "8cbf093e28493f052e6823e91709f271cb7f909c5f2345d955b661749e8fe047",
+        "buyer_fingerprint": "b7c469c00b41e3a7c9db2d7b7ce7ef273993ad73edd69a9243b95c7b43dea727",
+        "chain_data": {
+          "request_hash": "08d9e6ab62cdacde40ee55db26aa331ca945bb2eba0225bcd47d88669bc63375",
+          "response_hash": "8cbf093e28493f052e6823e91709f271cb7f909c5f2345d955b661749e8fe047",
+          "transaction_id": "pi_test_no_identity",
+          "timestamp": "2026-09-13T12:00:00Z",
+          "buyer_fingerprint": "b7c469c00b41e3a7c9db2d7b7ce7ef273993ad73edd69a9243b95c7b43dea727",
+          "seller": "corpus.arkforge.tech",
+          "agent_identity": null,
+          "agent_identity_verified": null,
+          "did_resolution_status": null,
+          "identity_consistent": null
+        },
+        "commitments": {
+          "request_hash": "6cd495cec9f2a57cffd5bf78983acae82c49f568419baa67944083acabfe9705",
+          "response_hash": "da5dbe1d94161fcf9ff18051f51cd26991324b3197af3435003eb15efe807002",
+          "transaction_id": "7c929738ac374be0c53f1d639684161c8a2f513d35c455bd0e4573c20a476615",
+          "timestamp": "ca67037675644082ce3f90fa3bff816ee4b92b65c5e5fc22808d24dbcbade4fa",
+          "buyer_fingerprint": "49d5ead9a84ef629d9ceb369049272e34a4456e47adc26a38150486809e64a25",
+          "seller": "7b88ea1af5463ecd3b3344ee6839ab8f881558c7e127794877c722301f39c925",
+          "agent_identity": "169be79df1432c6fdefc343c91a718ab0ec4088807ad3982e5cf6d6ade2e7f97",
+          "agent_identity_verified": "98348aaa6790cd123fbbd0b31701f255746ac5d86f7b8392d76a8be8632a128e",
+          "did_resolution_status": "d0c4647f3108bd52d7ca369963834f79a7277c7ecde956297203df7432fd1d38",
+          "identity_consistent": "6b7f4afb645968d68e0662f1a112b5fa3d30708ff60e4f1c5f905512ed99497e"
+        },
+        "published_nonces": {
+          "agent_identity": "9dfb59b283434e3a865efbeeb976a367ef4d3f91677d29d701f9118db2abc4a7",
+          "agent_identity_verified": "8900d3193539b78eaea5c9f53d0a99c8a968a5bba20c217a0fb64bdddde8921a",
+          "did_resolution_status": "a7a6b9dbe52c9f8aabfbba1ce952245580095bc0507b0d8ee1c12f8a83b52c86",
+          "identity_consistent": "e37ee1c1528e87d4f2c8f51cfaf143f464704de42a9e0d1055830e67b8001c5a"
+        },
+        "chain_hash": "a3c27f3e10af92d191fdf0da65efdf297e6d3a94efeffa5b949a2e3d4e99a73d"
+      }
     }
   ],
   "chain_formula_values": "SHA256(canonical_json({buyer_fingerprint, request_hash, response_hash, seller, timestamp, transaction_id [, upstream_timestamp] [, receipt_content_hash]})) — spec_version 1.2 / 2.1",

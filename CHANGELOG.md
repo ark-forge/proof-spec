@@ -11,6 +11,42 @@ Versioning: [Semantic Versioning](https://semver.org/spec/v2.0.0.html)
 
 ---
 
+## [3.1.0] — 2026-09-13
+
+### Added
+- **`parties.agent_identity`, `parties.agent_identity_verified`,
+  `parties.did_resolution_status` and `identity_consistent` are now committed chain
+  fields**, unconditionally: an
+  absent identity is committed as `null`. Up to 3.0 the three were served in public proof
+  responses (§9) but committed nowhere, so they sat outside the Merkle root, outside
+  `hashes.chain`, outside the Ed25519 signature and therefore outside the RFC 3161 token
+  and the Rekor entry. An attestor could restate an agent's identity after anchoring and
+  every external witness still verified. Any party reading `agent_identity_verified` as
+  evidence was reading the attestor's unbacked word.
+- **`disclosed`**: the identity block's `(nonce, value)` pairs, published in the proof
+  itself. These four nonces are public so that anyone can open the block and check the
+  served values against the anchored commitments. Hiding is given up on these four
+  fields and on no other; every remaining nonce stays secret.
+- `identity_consistent` is a judgment ON the identity: committing its three neighbours
+  and leaving it out would rebuild the same hole one field to the left.
+- Test vectors 13 and 14 (`identity_verified_did`,
+  `identity_absent_is_committed_as_null`), with their `published_nonces`.
+
+### Changed
+- `agent_identity_verified` is `true` or `null`, never `false`. One normalisation at the
+  source, so the committed value and the served value cannot disagree.
+- §9: for `spec_version` `"3.1"`, `disclosed` MUST be included in public responses.
+
+### Notes
+- `agent_version` is deliberately NOT committed: it carries no verifiable claim.
+- Anchoring the block makes the identity claim **non-repudiable**; it does not make the
+  binding itself third-party verifiable. No public artefact proves the Ed25519
+  challenge-response happened. A verifier needing more MUST resolve the DID itself.
+- Proofs at `spec_version` `"3.0"` and below keep their algorithm and stay verifiable.
+  Their identity fields carry no anchor and MUST NOT be treated as evidence.
+
+---
+
 ## [3.0.0] — 2026-09-13
 
 ### Changed
