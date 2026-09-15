@@ -1,16 +1,16 @@
 # ArkForge Proof Specification
 
-Open standard for verifiable agent-to-agent execution proofs.
+Open standard for verifiable proofs of the exchanges between AI agents and the APIs they call.
 
 **[Read the spec](SPEC.md)** | **[Test vectors](test-vectors.json)**
 
 ## What is this?
 
-A deterministic proof format that binds a request, response, payment, and timestamp into a single SHA-256 chain hash. Anyone can verify a proof without ArkForge's code or infrastructure.
+A deterministic proof format that binds a request, a response, the parties, a billing reference and a timestamp into a single SHA-256 chain hash. Anyone can verify a proof without ArkForge's code or infrastructure.
 
 ## Quick verification
 
-Given a proof JSON, verify it in one line:
+For a legacy proof (`spec_version` `"1.1"`, `"2.0"` or absent), the chain hash is a single concatenation:
 
 ```bash
 printf '%s' "${REQUEST_HASH}${RESPONSE_HASH}${PAYMENT_ID}${TIMESTAMP}${BUYER}${SELLER}${UPSTREAM}${RECEIPT_HASH}" \
@@ -18,6 +18,8 @@ printf '%s' "${REQUEST_HASH}${RESPONSE_HASH}${PAYMENT_ID}${TIMESTAMP}${BUYER}${S
 ```
 
 `UPSTREAM` and `RECEIPT_HASH` are empty strings when absent from the proof.
+
+Current proofs (`spec_version` `"3.0"` and above) use a Merkle root of per-field commitments instead: see section 5 of the spec. Recomputing the chain hash only shows internal consistency; the independent evidence is the RFC 3161 timestamp and the Sigstore Rekor entry.
 
 If the result matches `proof.hashes.chain`, the proof is intact.
 

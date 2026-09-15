@@ -1,6 +1,6 @@
-# ArkForge Proof Specification v3.1.1
+# ArkForge Proof Specification v3.1.2
 
-An open standard for verifiable agent-to-agent execution proofs.
+An open standard for verifiable proofs of the exchanges between AI agents and the APIs they call.
 
 ## Status
 
@@ -8,7 +8,7 @@ An open standard for verifiable agent-to-agent execution proofs.
 
 ## Goal
 
-Define a deterministic, independently verifiable proof format for agent-to-agent transactions. Any party — buyer, seller, auditor, regulator — can recompute and verify a proof without ArkForge's code or infrastructure.
+Define a deterministic, independently verifiable proof format for the exchanges between an AI agent and the services it calls. Any party (the caller, the called service, an auditor, a regulator) can recompute and verify a proof without ArkForge's code or infrastructure.
 
 ## Scope
 
@@ -40,13 +40,15 @@ A conformant proof is a JSON object. The following fields are **required**:
 | `hashes.response` | string | SHA-256 hash of canonical JSON response. Format: `sha256:<hex>` |
 | `hashes.chain` | string | Chain hash binding all components. Format: `sha256:<hex>` |
 | `commitments` | object | One commitment per committed field, `field -> sha256:<hex>` (spec_version `"3.0"`) |
-| `parties.buyer_fingerprint` | string | SHA-256 hash of the buyer's API key (hex) |
-| `parties.seller` | string | Target service domain (e.g. `arkforge.fr`) |
-| `payment.provider` | string | Payment provider identifier (see Payment variants) |
-| `payment.transaction_id` | string | Payment reference used in chain hash (see Payment variants) |
-| `payment.amount` | number | Payment amount |
+| `parties.buyer_fingerprint` | string | SHA-256 hash of the caller's API key (hex). Historical name, see the note below |
+| `parties.seller` | string | Target service domain (e.g. `arkforge.fr`). Historical name, see the note below |
+| `payment.provider` | string | How the certification of this proof was billed (see Billing variants) |
+| `payment.transaction_id` | string | Billing reference of the certification, used in chain hash (see Billing variants) |
+| `payment.amount` | number | Amount charged for the certification (`0.0` on the free tier) |
 | `payment.currency` | string | Currency code (e.g. `"eur"`) |
-| `payment.status` | string | Payment status (e.g. `"succeeded"`, `"free_tier"`) |
+| `payment.status` | string | Billing status (e.g. `"succeeded"`, `"free_tier"`) |
+
+**Note on field names.** `payment`, `parties.buyer_fingerprint` and `parties.seller` are historical names, kept because they are part of the chain hash of every existing proof. `payment` records how the certification of the proof itself was billed; it is not a payment between the agent and the target service. `buyer_fingerprint` identifies the caller's API key and `seller` is the target domain; neither implies that anything was bought or sold. A payment made by the agent to a service is recorded only when the optional `provider_payment` evidence is present (section 2.1).
 
 ### Minimal example (required fields only)
 
@@ -131,9 +133,9 @@ A conformant proof is a JSON object. The following fields are **required**:
 - `"1.2"`, `"2.1"`: canonical JSON over the values themselves — see section 2 backward compatibility
 - `"1.1"`, `"2.0"` (legacy): string concatenation — same section
 
-### Payment variants
+### Billing variants
 
-The `payment` object reflects how the proof was generated:
+The `payment` object records how the certification of the proof was billed:
 
 | Plan | `provider` | `transaction_id` | `amount` | `status` |
 |------|-----------|-----------------|----------|----------|
@@ -169,7 +171,7 @@ All variants produce a valid chain hash. The `payment.transaction_id` value is u
 
 ## 2. Chain hash algorithm
 
-The chain hash binds every element of a transaction into a single verifiable seal.
+The chain hash binds every element of an exchange into a single verifiable seal.
 
 ### Algorithm (spec_version "3.1" — current)
 
