@@ -11,6 +11,16 @@ Versioning: [Semantic Versioning](https://semver.org/spec/v2.0.0.html)
 
 ---
 
+## [3.1.2] — 2026-09-15
+
+Wording only. No change to the proof format, the algorithms or the test vector data (only the document version in `test-vectors.json` moves to 3.1.2).
+
+### Fixed
+- The goal and field descriptions framed every proof as a purchase between a buyer and a seller. `payment` records how the certification of the proof was billed, and `buyer_fingerprint` / `seller` identify the caller's key and the target domain. A note now says these are historical names kept for chain hash compatibility, and that a payment to a service is recorded only through `provider_payment`.
+- The README presented the string-concatenation check as the way to verify any proof. It only applies to legacy proofs; current proofs use per-field commitments (section 5).
+
+---
+
 ## [3.1.1] — 2026-09-14
 
 Wording only. No change to the proof format, the algorithms or the test vectors.

@@ -1,5 +1,5 @@
 {
-  "spec_version": "3.1.1",
+  "spec_version": "3.1.2",
   "algorithm": "SHA-256",
   "canonical_json_rule": "json.dumps(data, sort_keys=True, separators=(\",\", \":\"))",
   "chain_formula_current": "MerkleRoot_RFC6962({ SHA256(field || 0x00 || nonce || canonical_json(value)) for each chain field }, leaves ordered by field name)",
