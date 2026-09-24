@@ -1,4 +1,4 @@
-# ArkForge Proof Specification v3.1.2
+# ArkForge Proof Specification v3.1.3
 
 An open standard for verifiable proofs of the exchanges between AI agents and the APIs they call.
 
@@ -155,6 +155,7 @@ All variants produce a valid chain hash. The `payment.transaction_id` value is u
 | `provider_payment` | object | External receipt verification (see section 2.1). `receipt_content_hash` **included in chain hash** when present |
 | `arkforge_signature` | string | Ed25519 signature of the chain hash. Format: `ed25519:<base64url_without_padding>` |
 | `arkforge_pubkey` | string | Ed25519 public key used for signing. Format: `ed25519:<base64url_without_padding>` |
+| `arkforge_kid` | string | Identifier of the signing key in the published key history (e.g. `key-2`), see section 6, *Key history and rotation*. Absent from proofs issued before key rotation. Not included in the chain hash |
 | `verification_url` | string | URL to verify and view the proof (e.g. `https://trust.arkforge.tech/v1/proof/<proof_id>`) |
 | `parties.agent_identity` | string | Agent identity. If the API key has a cryptographically verified DID bound via Ed25519 challenge-response, this field contains the verified DID and takes precedence over any caller-declared value. Otherwise, contains the caller's self-declared name. |
 | `parties.agent_identity_verified` | bool | `true` if `agent_identity` is a cryptographically verified DID bound to the API key. Absent if the identity is self-declared. |
@@ -642,6 +643,7 @@ The chain hash MAY be signed by the proof issuer using Ed25519. This proves **or
 |-------|-------------|
 | `arkforge_signature` | Ed25519 signature of the chain hash. Format: `ed25519:<base64url>` |
 | `arkforge_pubkey` | Public key used for signing. Format: `ed25519:<base64url>` |
+| `arkforge_kid` | Key identifier in the published key history. Absent before key rotation |
 
 ### Verification
 
@@ -675,10 +677,33 @@ Covered means the attestor cannot change these values after signing without brea
 
 The issuer's public key is embedded in each proof (`arkforge_pubkey`) and served at two canonical endpoints:
 
-- `GET /v1/pubkey` — JSON `{"pubkey": "ed25519:<base64url>", "algorithm": "Ed25519"}`
-- `GET /.well-known/did.json` — W3C DID Document (`did:web:trust.arkforge.tech`) with `Ed25519VerificationKey2020` and `publicKeyJwk` (kty=OKP, crv=Ed25519, x=`<base64url>`)
+- `GET /v1/pubkey` — JSON. `pubkey`, `algorithm` and `kid` describe the key of the node answering; `rekor_pubkey`, `rekor_algorithm` and `rekor_kid` its Sigstore Rekor submission key (section 7.1). `keys` and `rekor_keys` list the full key history (below).
+- `GET /.well-known/did.json` — W3C DID Document (`did:web:trust.arkforge.tech`). Every published Ed25519 key is a verification method (`Ed25519VerificationKey2020`, `publicKeyJwk` with kty=OKP, crv=Ed25519, x=`<base64url>`), id `did:web:trust.arkforge.tech#<kid>`. The key of the node answering comes first. Only keys that are not retired appear in `assertionMethod` and `authentication`.
 
 Verifiers SHOULD pin the public key from a trusted source rather than relying solely on the `arkforge_pubkey` field within the proof itself. The DID Document can be resolved by any conformant `did:web` resolver.
+
+### Key history and rotation
+
+Each serving node holds its own Ed25519 key and its own Rekor key. The private keys live in a separate signing service on the node and never leave it: they are not copied, exported or backed up. A key that is lost or suspected exposed is not restored; a new key is published and the old one is retired. The history is append-only: a retired key stays listed forever, so proofs it signed remain verifiable.
+
+Each entry of `keys` (Ed25519) and `rekor_keys` (ECDSA P-256) carries:
+
+| Field | Description |
+|-------|-------------|
+| `kid` | Key identifier: `key-<n>` for Ed25519, `rekor-<n>` for Rekor |
+| `type` | `Ed25519` or `ECDSA-P256-SHA256` |
+| `public` / `public_pem` | The public key: `ed25519:<base64url>` for Ed25519, PEM (SPKI) for Rekor |
+| `node` | Node that holds the key |
+| `valid_from` | UTC time from which the key signs |
+| `retired_at` | UTC time from which the key no longer signs, or `null` while active |
+
+Several keys may be active at once (one per node: a standby node signs with its own key after a failover).
+
+**Verification rule.** A verifier selects the key named by the proof's `arkforge_kid`; for a proof without `arkforge_kid` (issued before rotation), the history entry whose `public` equals `arkforge_pubkey`. The proof MUST be rejected if no such entry exists, if `arkforge_pubkey` differs from the entry's key, or if the entry has a `retired_at` that is not later than the proof's `timestamp`. The same date rule applies to the Rekor key that submitted a log entry.
+
+A verifier written for a single key (reading only `verificationMethod[0]` or `pubkey`) keeps verifying proofs signed by the key of the node it queries, and fails on proofs signed by any other key of the history. Such a verifier should be updated to the rule above.
+
+**2026-10 rotation.** `key-1` and `rekor-1`, shared by both nodes until then, are retired at the switch to per-node keys held by the signing service; `key-2` / `rekor-2` sign on the primary node, `key-3` / `rekor-3` on the standby.
 
 ## 7. Independent witnesses
 
@@ -686,7 +711,7 @@ A proof MAY be corroborated by independent witnesses:
 
 | Witness | What it proves | Verification | Availability |
 |---------|---------------|--------------|-------------|
-| **Ed25519 Signature** | Proof was issued by ArkForge | Verify `arkforge_signature` with `arkforge_pubkey` | All plans |
+| **Ed25519 Signature** | Proof was issued by ArkForge | Verify `arkforge_signature` with the key the proof names in the published key history (section 6) | All plans |
 | **RFC 3161 Timestamp** | Proof existed at claimed time | Verify `.tsr` file via `openssl ts -verify` | All plans |
 | **Sigstore Rekor** | Chain hash registered in append-only public log | See section 7.1 | All plans |
 | **Stripe** | Payment occurred | Check `payment.transaction_id` on Stripe dashboard or API | Pro plan only |
