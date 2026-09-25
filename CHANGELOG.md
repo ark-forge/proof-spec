@@ -11,6 +11,18 @@ Versioning: [Semantic Versioning](https://semver.org/spec/v2.0.0.html)
 
 ---
 
+## [3.1.3] — 2026-09-24
+
+No change to the chain hash, the commitments or the test vector data (only the document version in `test-vectors.json` moves to 3.1.3). The proof `spec_version`, which selects the chain hash algorithm, stays 3.1: `arkforge_kid` is optional and outside the chain hash.
+
+### Added
+- Section 6, *Key history and rotation*: one Ed25519 key and one Rekor key per node, held by a signing service and never copied; append-only history published at `/v1/pubkey` (`keys`, `rekor_keys`) and in the DID Document; verification rule by `kid` and retirement date.
+- `arkforge_kid`: identifier of the signing key, outside the chain hash.
+- `/v1/pubkey` adds `kid` and `rekor_kid`; the DID Document lists every key, the node key first, only non-retired keys in `assertionMethod`.
+
+### Changed
+- Section 7: the Ed25519 witness is verified with the key the proof names in the key history, no longer with a single published key.
+
 ## [3.1.2] — 2026-09-15
 
 Wording only. No change to the proof format, the algorithms or the test vector data (only the document version in `test-vectors.json` moves to 3.1.2).
